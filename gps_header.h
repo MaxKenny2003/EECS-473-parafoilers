@@ -7,7 +7,7 @@
  * This header defines the software interface for the u-blox NEO-M9N GPS receiver. It
  * abstracts the low-level UART communication and the parsing of NMEA or UBX binary protocol
  * messages. The application layer can initialize the module and retrieve a structured
- * navigation solution.
+ * navigation solution
  */
 
 #ifndef GPS_UBLOX_NEO_M9N_H
