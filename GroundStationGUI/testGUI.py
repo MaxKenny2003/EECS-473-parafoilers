@@ -19,6 +19,7 @@ from matplotlib.figure import Figure
 
 DEFAULT_BAUD = 9600
 PLOT_POINTS = 100
+GUI_UPDATE_PERIOD = 50
 
 class XBeeDashboard(tk.Tk):
     def __init__(self):
@@ -30,14 +31,19 @@ class XBeeDashboard(tk.Tk):
         self.stop_event = threading.Event()
         self.rx_thread = None
 
-        # Telemetry values
+        # Telemetry values 
         self.telemetry = {"TEMP": "N/A", "HUM": "N/A", "BAT": "N/A", "ALTITUDE": "N/A"}
         self.temp_history = deque(maxlen=PLOT_POINTS)
 
         # Control Mode Radiobutton Labels
-        self.modes = ["Manual", "Auton"]
+        self.modes = ["Auton", "Manual"]
         # Create a shared control variable for both Radiobuttons
-        self.modeVar = tk.StringVar(value="manual")
+        self.modeVar = tk.StringVar(value="Auton")
+        self.manualFrameDrawn = False;
+
+        # Create Entry Variables for the Send GPS Coords Button
+        self.gpsLatitudeVar = tk.DoubleVar()
+        self.gpsLongitudeVar = tk.DoubleVar()
 
         self._build_ui()
         self.after(500, self._periodic_ui_update)
@@ -82,13 +88,10 @@ class XBeeDashboard(tk.Tk):
 
 
         # Left Frame: telemetry data + control settings (Auton/Manual, etc)
-        left = ttk.Frame(self)
-        left.grid(column=0, row=1)
+        self.left = ttk.Frame(self)
+        self.left.grid(column=0, row=1)
         # left.pack(side="")
-        # Middle frame: dashboard + console + button commands
-        middle = ttk.Frame(self)
-        # middle.pack(side="top", fill="both", expand=True, padx=8, pady=6)
-        middle.grid(column=1, row=1)
+
 
         # Reserve the following spots in the grid for each frame:
         # For Dashboard and DashboardTwo, use column = 0, and then rows=0 and 1
@@ -98,54 +101,67 @@ class XBeeDashboard(tk.Tk):
 
 
         # Left-Middle frame: dashboard widgets
-        dash_frame = ttk.LabelFrame(middle, text="Telemetry")
+
+        # "Telemetry" Frame
+        telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
         # dash_frame.pack(side="left", fill="y", padx=(0,8))
-        dash_frame.grid(column=0, row=0, ipady=12)
+        telemetryFrame.grid(column=0, row=0, ipady=12)
 
         row = 0
         for key in ["TEMP", "HUM", "BAT", "ALTITUDE"]:
-            ttk.Label(dash_frame, text=f"{key}:", font=("TkDefaultFont", 10)).grid(row=row, column=0, sticky="w", padx=6, pady=6)
-            lbl = ttk.Label(dash_frame, text=self.telemetry[key], font=("TkDefaultFont", 12, "bold"))
+            ttk.Label(telemetryFrame, text=f"{key}:", font=("TkDefaultFont", 10)).grid(row=row, column=0, sticky="w", padx=6, pady=6)
+            lbl = ttk.Label(telemetryFrame, text=self.telemetry[key], font=("TkDefaultFont", 12, "bold"))
             lbl.grid(row=row, column=1, sticky="w", padx=6, pady=6)
             setattr(self, f"lbl_{key}", lbl)
             row += 1
 
-        # Left Two: mode widgets
-        dash_frame_two = ttk.LabelFrame(middle, text="Modes")
-        # dash_frame_two.pack(side="left", padx=(0,8))
-        dash_frame_two.grid(column=1, row=0)
+        # "Mode" Frame
+        modesFrame = ttk.LabelFrame(self.left, text="Modes")
+        modesFrame.grid(column=1, row=0)
+
+        auton = ttk.Radiobutton(modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
+        auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
+        manual = ttk.Radiobutton(modesFrame, text=self.modes[1], variable=self.modeVar, value="Manual")
+        manual.grid(row=2, column=2, sticky="w", padx=6, pady=6)
+
+        # Middle frame: dashboard + console + button commands
+        middle = ttk.Frame(self)
+        # middle.pack(side="top", fill="both", expand=True, padx=8, pady=6)
+        middle.grid(column=1, row=1)
+
+        console_frame = ttk.LabelFrame(middle, text="Console")
+        # console_frame.pack(side="top", fill="both", expand=True)
+        console_frame.grid(column=0, row=0)
+        self.console = scrolledtext.ScrolledText(console_frame, height=12, state="disabled", wrap="none")
+        self.console.pack(fill="both", expand=True, padx=4, pady=4)
+  
+        # Console Commands (E-Stop, Send Coordinates)
+        consoleCommandsFrame = ttk.LabelFrame(middle, text="Commands")
+        consoleCommandsFrame.grid(column=0, row=1)
+        # Command button to send the laptop's GPS coordinates
+        # button = ttk.Button(parent, text='Okay', command=submitForm)
+        emergencyStopButton = ttk.Button(consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
+        emergencyStopButton.grid(column=0, row=0)
 
 
-
-        manual = ttk.Radiobutton(dash_frame_two, text=self.modes[0], variable=self.modeVar, value="manual")
-        manual.grid(row=1, column=2, sticky="w", padx=6, pady=6)
-        # lbl_manual = ttk.Label(dash_frame_two, text=self.modes[0], font=("TkDefaultFont", 12, "normal"))
-        # lbl_manual.grid(row=4, column=1, sticky="w", padx=6, pady=6)
-        auton = ttk.Radiobutton(dash_frame_two, text=self.modes[1], variable=self.modeVar, value="auton")
-        auton.grid(row=2, column=2, sticky="w", padx=6, pady=6)
-        # lbl_auton = ttk.Label(dash_frame_two, text=self.modes[1], font=("TkDefaultFont", 12, "normal"))
-        # lbl_auton.grid(row=5, column=1, sticky="w", padx=6, pady=6)
-
+        # Send GPS Coordinates (Button and Entries)
+        sendGPSButton = ttk.Button(consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
+        #sendGPSButton.pack()
+        sendGPSButton.grid(column=0, row=1)
+        sendGPSLatitudeLabel = ttk.Label(consoleCommandsFrame, text='Latitude: ')
+        sendGPSLatitudeLabel.grid(column=1, row=1)
+        sendGPSLatitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLatitudeVar)
+        sendGPSLatitudeEntry.grid(column=2, row=1)
+        sendGPSLongitudeLabel = ttk.Label(consoleCommandsFrame, text='Longitude: ')
+        sendGPSLongitudeLabel.grid(column=3, row=1)
+        sendGPSLongitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
+        sendGPSLongitudeEntry.grid(column=4, row=1)        
         # Right: Map and other Data
         right = ttk.Frame(self)
         # right.pack(side="left", fill="both", expand=True)
         right.grid(row=1, column=3)
-        console_frame = ttk.LabelFrame(right, text="Console")
-        console_frame.pack(side="top", fill="both", expand=True)
 
-        self.console = scrolledtext.ScrolledText(console_frame, height=12, state="disabled", wrap="none")
-        self.console.pack(fill="both", expand=True, padx=4, pady=4)
-
-
-        # Command button to send the laptop's GPS coordinates
-        # button = ttk.Button(parent, text='Okay', command=submitForm)
-
-        # Todo: Uncomment and fix
-        # sendGPSButton = ttk.Button(middle, text='Send Current GPS Coordinates');
-        #sendGPSButton.pack()
-        # sendGPSButton.grid(column=)
-        
-        # Temperature Plot Feature from GPT (Could change to something else?)
+        # Temperature Plot 
         # Plot area
         # plot_frame = ttk.LabelFrame(right, text="Temperature (last values)")
         # plot_frame.pack(side="top", fill="both", expand=True, pady=(6,0))
@@ -173,8 +189,12 @@ class XBeeDashboard(tk.Tk):
         # self.send_entry = ttk.Entry(middle, width=13)
         # self.send_entry.pack(side="left", padx=6)
         # self.send_entry.bind("<Return>", lambda e: self._send_text())
+            # Left-Middle Frame Functions: Manual/Auton Mode switches
 
-        
+
+    
+
+    # Functions for Top Frame: Serial, Connection, and others
 
     def _scan_ports(self):
         ports = [p.device for p in serial.tools.list_ports.comports()]
@@ -273,6 +293,36 @@ class XBeeDashboard(tk.Tk):
             # not telemetry or parse error — ignore for dashboard
             pass
 
+    # Function to switch to manual mode, redraw control buttons, etc
+    # These have been written here to provide scope of upper function to those below
+    def toggleModeCheck(self):
+        # Check to see if we are in the right condition
+        # Case 1: We want to draw the Manual Frame and are in the right conditions
+        if (self.manualFrameDrawn == False and self.modeVar.get() == "Manual"):
+            # self.drawControlFrame()
+            # telemetryFrame = ttk.LabelFrame(left, text="Telemetry")
+            # Draw Control Frame
+            self.controlFrame = ttk.LabelFrame(self.left, text="Manual Controls")
+            self.controlFrame.grid(column=0, row=1)
+            # Draw Left and Right buttons
+            turnLeftButtom = ttk.Button(self.controlFrame, text="Turn Left")
+            turnLeftButtom.grid(column=0, row = 0)
+            turnRightButton = ttk.Button(self.controlFrame, text="Turn Right")
+            turnRightButton.grid(column=1, row=0)
+            self.manualFrameDrawn = True
+            # Send a Log of the Toggle to Console
+            self._log("Toggled to Manual Mode")
+            
+        # Case 2: We want to destory the Frame  (and potentially draw the Auton frame) and are in the right conditions
+        # Todo: ask team what metrics / inputs should be needed for this section
+        elif (self.manualFrameDrawn == True and self.modeVar.get() == "Auton"):
+            # Destroy the Control Frame from the Left GUI:
+            self.controlFrame.destroy()
+            self.manualFrameDrawn = False
+            # Send a Log of the Toggle to Console
+            self._log("Toggled to Autonomous Mode")
+
+    # Middle Frame Functions: Console, Console Commands, and etc.
     def _log(self, text):
         # append to console thread-safely using after
         ts = time.strftime("%H:%M:%S")
@@ -286,22 +336,44 @@ class XBeeDashboard(tk.Tk):
         self.lbl_HUM.config(text=str(self.telemetry["HUM"]))
         self.lbl_BAT.config(text=str(self.telemetry["BAT"]))
 
+    def _emergencyStopCmd(self):
+        self._log("E-Stoped the Parafoil.")
+        # Todo: Call the "deadfall" function to stop the parafoil
+        # Todo: Ask team if the GUI should go "unresponsiive" after the function
+    def _sendGPSCmd(self):
+        # Todo: Ask team for function to perform this on the system
+        # Placeholder command to test that we can send numbers
+        # Convert `inLatitude` and `inLongitude` from floats to strings
+        # Todo: Fix the below when the entry widgets are set up
+        # Place holder values until entry widgets have been set up
+        # Grab Double Values from the GUI entries
+
+
+        latStr = str(self.gpsLatitudeVar.get())
+        longStr = str(self.gpsLongitudeVar.get())
+        # latStr = str(12.111)
+        # longStr = str(-10.001)
+        self._log("Rerouted coordinates to " + latStr + "," + longStr)
     def _periodic_ui_update(self):
         # update plot
-        data = list(self.temp_history)
-        if data:
-            self.line.set_data(range(len(data)), data)
-            self.ax.set_xlim(0, max(len(data)-1, PLOT_POINTS))
-            ymin = min(data)
-            ymax = max(data)
-            if ymin == ymax:
-                ymin -= 0.5
-                ymax += 0.5
-            self.ax.set_ylim(ymin, ymax)
-        else:
-            self.line.set_data([], [])
-        self.canvas.draw_idle()
-        self.after(500, self._periodic_ui_update)
+        # data = list(self.temp_history)
+        # if data:
+        #     self.line.set_data(range(len(data)), data)
+        #     self.ax.set_xlim(0, max(len(data)-1, PLOT_POINTS))
+        #     ymin = min(data)
+        #     ymax = max(data)
+        #     if ymin == ymax:
+        #         ymin -= 0.5
+        #         ymax += 0.5
+        #     self.ax.set_ylim(ymin, ymax)
+        # else:
+        #     self.line.set_data([], [])
+        # self.canvas.draw_idle()
+        # ^^^ Don't need the update plot
+
+        # Run GUI Checks
+        self.toggleModeCheck()
+        self.after(GUI_UPDATE_PERIOD, self._periodic_ui_update)
 
     def _send_text(self):
         text = self.send_entry.get().strip()
