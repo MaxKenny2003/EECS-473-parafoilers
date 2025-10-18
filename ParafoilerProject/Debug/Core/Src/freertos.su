@@ -1,7 +1,0 @@
-../Core/Src/freertos.c:105:6:MX_FREERTOS_Init	8	static
-../Core/Src/freertos.c:145:6:StartDefaultTask	16	static
-../Core/Src/freertos.c:150:6:read_GPS	560	static
-../Core/Src/freertos.c:198:6:updateServos	32	static
-../Core/Src/freertos.c:259:6:readCoord	32	static
-../Core/Src/freertos.c:293:6:StartBno085Task	232	static
-../Core/Src/freertos.c:370:13:get_accuracy_string	16	static

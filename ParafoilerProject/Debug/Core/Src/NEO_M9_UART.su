@@ -1,3 +1,0 @@
-../Core/Src/NEO_M9_UART.c:18:13:calculate_checksum	32	static
-../Core/Src/NEO_M9_UART.c:32:6:M9N_Init	128	static
-../Core/Src/NEO_M9_UART.c:134:6:processGPS	40	static
