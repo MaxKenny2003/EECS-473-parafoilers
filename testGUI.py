@@ -1,0 +1,400 @@
+#!/usr/bin/env python3
+"""
+xbee_dashboard.py
+Requires: pyserial, matplotlib
+pip install pyserial matplotlib
+"""
+
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox
+import serial
+import serial.tools.list_ports
+import threading
+import time
+from collections import deque
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
+DEFAULT_BAUD = 9600
+PLOT_POINTS = 100
+GUI_UPDATE_PERIOD = 50
+
+class XBeeDashboard(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("XBee Dashboard")
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        self.serial_port = None
+        self.stop_event = threading.Event()
+        self.rx_thread = None
+
+        # Telemetry values 
+        self.telemetry = {"TEMP": "N/A", "HUM": "N/A", "BAT": "N/A", "ALTITUDE": "N/A"}
+        self.temp_history = deque(maxlen=PLOT_POINTS)
+
+        # Control Mode Radiobutton Labels
+        self.modes = ["Auton", "Manual"]
+        # Create a shared control variable for both Radiobuttons
+        self.modeVar = tk.StringVar(value="Auton")
+        self.manualFrameDrawn = False;
+
+        # Create Entry Variables for the Send GPS Coords Button
+        self.gpsLatitudeVar = tk.DoubleVar()
+        self.gpsLongitudeVar = tk.DoubleVar()
+
+        self._build_ui()
+        self.after(500, self._periodic_ui_update)
+
+    def _build_ui(self):
+        # Main Frame: This will be the top-most level Frame of the GUI
+        # (This can be thought of as the "root node" of our tree of frames)
+
+        # main = ttk.Frame(self)
+
+        # Top frame: connection controls
+        top = ttk.Frame(self)
+        # top = ttk.Frame(main)
+        # top.pack(side="top", fill="x", padx=8, pady=6)
+        top.grid(column=0, row=0);
+
+        # Port Selector Group
+        ttk.Label(top, text="Port:").grid(column=0, row=0);
+        self.port_cb = ttk.Combobox(top, width=8, values=self._scan_ports())
+        #self.port_cb.pack(side="left", padx=4)
+        self.port_cb.grid(column=1, row=0, padx=4)
+        self.port_cb.set(self.port_cb['values'][0] if self.port_cb['values'] else "")
+
+       # ttk.Label(top, text="Baud:").pack(side="left", padx=(10,0))
+        ttk.Label(top, text="Baud:").grid(column=2, row=0);
+        self.baud_cb = ttk.Combobox(top, width=8, values=[9600, 19200, 38400, 57600, 115200])
+        #self.baud_cb.pack(side="left", padx=4)
+        self.baud_cb.grid(column=3, row=0, padx=4)
+        self.baud_cb.set(DEFAULT_BAUD)
+
+        self.scan_btn = ttk.Button(top, text="Scan Ports", command=self._do_scan)
+        # self.scan_btn.pack(side="left", padx=6)
+        self.scan_btn.grid(column=1, row=1, padx=4)
+
+        self.connect_btn = ttk.Button(top, text="Connect", command=self.connect)
+        # self.connect_btn.pack(side="left", padx=6)
+        self.connect_btn.grid(column=2, row=1, padx=4)
+
+        self.disconnect_btn = ttk.Button(top, text="Disconnect", command=self.disconnect, state="disabled")
+        # self.disconnect_btn.pack(side="left", padx=2)
+        self.disconnect_btn.grid(column=3, row=1, padx=4)
+
+
+        # Left Frame: telemetry data + control settings (Auton/Manual, etc)
+        self.left = ttk.Frame(self)
+        self.left.grid(column=0, row=1)
+        # left.pack(side="")
+
+
+        # Reserve the following spots in the grid for each frame:
+        # For Dashboard and DashboardTwo, use column = 0, and then rows=0 and 1
+        # For Console use column = 1 and rows = 0
+        # Todo: For Console buttons and commands, make a seperate frame and put it at column = 1, rows = 1
+        # Todo: For Map Frame, place it at column = 2 and rows = 0
+
+
+        # Left-Middle frame: dashboard widgets
+
+        # "Telemetry" Frame
+        telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
+        # dash_frame.pack(side="left", fill="y", padx=(0,8))
+        telemetryFrame.grid(column=0, row=0, ipady=12)
+
+        row = 0
+        for key in ["TEMP", "HUM", "BAT", "ALTITUDE"]:
+            ttk.Label(telemetryFrame, text=f"{key}:", font=("TkDefaultFont", 10)).grid(row=row, column=0, sticky="w", padx=6, pady=6)
+            lbl = ttk.Label(telemetryFrame, text=self.telemetry[key], font=("TkDefaultFont", 12, "bold"))
+            lbl.grid(row=row, column=1, sticky="w", padx=6, pady=6)
+            setattr(self, f"lbl_{key}", lbl)
+            row += 1
+
+        # "Mode" Frame
+        modesFrame = ttk.LabelFrame(self.left, text="Modes")
+        modesFrame.grid(column=1, row=0)
+
+        auton = ttk.Radiobutton(modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
+        auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
+        manual = ttk.Radiobutton(modesFrame, text=self.modes[1], variable=self.modeVar, value="Manual")
+        manual.grid(row=2, column=2, sticky="w", padx=6, pady=6)
+
+        # Middle frame: dashboard + console + button commands
+        middle = ttk.Frame(self)
+        # middle.pack(side="top", fill="both", expand=True, padx=8, pady=6)
+        middle.grid(column=1, row=1)
+
+        console_frame = ttk.LabelFrame(middle, text="Console")
+        # console_frame.pack(side="top", fill="both", expand=True)
+        console_frame.grid(column=0, row=0)
+        self.console = scrolledtext.ScrolledText(console_frame, height=12, state="disabled", wrap="none")
+        self.console.pack(fill="both", expand=True, padx=4, pady=4)
+  
+        # Console Commands (E-Stop, Send Coordinates)
+        consoleCommandsFrame = ttk.LabelFrame(middle, text="Commands")
+        consoleCommandsFrame.grid(column=0, row=1)
+        # Command button to send the laptop's GPS coordinates
+        # button = ttk.Button(parent, text='Okay', command=submitForm)
+        emergencyStopButton = ttk.Button(consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
+        emergencyStopButton.grid(column=0, row=0)
+
+
+        # Send GPS Coordinates (Button and Entries)
+        sendGPSButton = ttk.Button(consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
+        #sendGPSButton.pack()
+        sendGPSButton.grid(column=0, row=1)
+        sendGPSLatitudeLabel = ttk.Label(consoleCommandsFrame, text='Latitude: ')
+        sendGPSLatitudeLabel.grid(column=1, row=1)
+        sendGPSLatitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLatitudeVar)
+        sendGPSLatitudeEntry.grid(column=2, row=1)
+        sendGPSLongitudeLabel = ttk.Label(consoleCommandsFrame, text='Longitude: ')
+        sendGPSLongitudeLabel.grid(column=3, row=1)
+        sendGPSLongitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
+        sendGPSLongitudeEntry.grid(column=4, row=1)        
+        # Right: Map and other Data
+        right = ttk.Frame(self)
+        # right.pack(side="left", fill="both", expand=True)
+        right.grid(row=1, column=3)
+
+        # Temperature Plot 
+        # Plot area
+        # plot_frame = ttk.LabelFrame(right, text="Temperature (last values)")
+        # plot_frame.pack(side="top", fill="both", expand=True, pady=(6,0))
+
+        # self.fig = Figure(figsize=(5,2.2))
+        # self.ax = self.fig.add_subplot(111)
+        # self.ax.set_title("Temperature")
+        # self.ax.set_xlabel("samples")
+        # self.ax.set_ylabel("°C")
+        # self.line, = self.ax.plot([], [])
+        # self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+        # self.canvas.get_tk_widget().pack(fill="both", expand=True)
+
+        # Bottom: manual send
+        # Parafoil: This will be where we send packets / specific characters to the payload
+        # bottom = ttk.Frame(self)
+        # bottom.pack(side="bottom", fill="x", padx=8, pady=6)
+
+        #ttk.Label(bottom, text="Send Packet:").pack(side="left")
+
+        # Todo: uncomment and rewrite
+        # self.send_btn = ttk.Button(middle, text="Send Packet", command=self._send_text)
+        # self.send_btn.pack(side="left")
+
+        # self.send_entry = ttk.Entry(middle, width=13)
+        # self.send_entry.pack(side="left", padx=6)
+        # self.send_entry.bind("<Return>", lambda e: self._send_text())
+            # Left-Middle Frame Functions: Manual/Auton Mode switches
+
+
+    
+
+    # Functions for Top Frame: Serial, Connection, and others
+
+    def _scan_ports(self):
+        ports = [p.device for p in serial.tools.list_ports.comports()]
+        return ports
+
+    def _do_scan(self):
+        ports = self._scan_ports()
+        self.port_cb['values'] = ports
+        if ports:
+            self.port_cb.set(ports[0])
+        self._log("Scanned ports: " + ", ".join(ports))
+
+    def connect(self):
+        port = self.port_cb.get()
+        try:
+            baud = int(self.baud_cb.get())
+        except:
+            baud = DEFAULT_BAUD
+
+        if not port:
+            messagebox.showwarning("Port required", "Please choose a serial port.")
+            return
+
+        try:
+            self.serial_port = serial.Serial(port, baud, timeout=0.5)
+        except Exception as e:
+            messagebox.showerror("Open port failed", f"Could not open {port}: {e}")
+            return
+
+        self.connect_btn.config(state="disabled")
+        self.disconnect_btn.config(state="normal")
+        self.scan_btn.config(state="disabled")
+        self._log(f"Connected to {port} @ {baud}")
+        self.stop_event.clear()
+        self.rx_thread = threading.Thread(target=self._rx_worker, daemon=True)
+        self.rx_thread.start()
+
+    def disconnect(self):
+        self.stop_event.set()
+        if self.rx_thread:
+            self.rx_thread.join(timeout=1.0)
+            self.rx_thread = None
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+        self.serial_port = None
+        self.connect_btn.config(state="normal")
+        self.disconnect_btn.config(state="disabled")
+        self.scan_btn.config(state="normal")
+        self._log("Disconnected")
+
+    def _rx_worker(self):
+        buff = bytearray()
+        while not self.stop_event.is_set():
+            try:
+                if self.serial_port is None:
+                    break
+                data = self.serial_port.read(128)
+                if data:
+                    buff.extend(data)
+                    # handle lines
+                    while b'\n' in buff:
+                        idx = buff.index(b'\n')
+                        line = buff[:idx+1].decode(errors='replace').strip()
+                        buff = buff[idx+1:]
+                        self._handle_line(line)
+                else:
+                    time.sleep(0.01)
+            except Exception as e:
+                self._log(f"Serial read error: {e}")
+                time.sleep(0.5)
+
+    def _handle_line(self, line):
+        # Display raw line
+        self._log("RX: " + line)
+
+        # Expect telemetry as KEY=VALUE;KEY=VALUE;...\n
+        try:
+            parts = line.strip().split(';')
+            changed = False
+            for p in parts:
+                if '=' in p:
+                    k,v = p.split('=',1)
+                    k=k.strip().upper()
+                    v=v.strip()
+                    if k in self.telemetry:
+                        self.telemetry[k] = v
+                        changed = True
+                        if k == "TEMP":
+                            try:
+                                self.temp_history.append(float(v))
+                            except:
+                                pass
+            if changed:
+                self._update_dashboard_widgets()
+        except Exception as e:
+            # not telemetry or parse error — ignore for dashboard
+            pass
+
+    # Function to switch to manual mode, redraw control buttons, etc
+    # These have been written here to provide scope of upper function to those below
+    def toggleModeCheck(self):
+        # Check to see if we are in the right condition
+        # Case 1: We want to draw the Manual Frame and are in the right conditions
+        if (self.manualFrameDrawn == False and self.modeVar.get() == "Manual"):
+            # self.drawControlFrame()
+            # telemetryFrame = ttk.LabelFrame(left, text="Telemetry")
+            # Draw Control Frame
+            self.controlFrame = ttk.LabelFrame(self.left, text="Manual Controls")
+            self.controlFrame.grid(column=0, row=1)
+            # Draw Left and Right buttons
+            turnLeftButtom = ttk.Button(self.controlFrame, text="Turn Left")
+            turnLeftButtom.grid(column=0, row = 0)
+            turnRightButton = ttk.Button(self.controlFrame, text="Turn Right")
+            turnRightButton.grid(column=1, row=0)
+            self.manualFrameDrawn = True
+            # Send a Log of the Toggle to Console
+            self._log("Toggled to Manual Mode")
+            
+        # Case 2: We want to destory the Frame  (and potentially draw the Auton frame) and are in the right conditions
+        # Todo: ask team what metrics / inputs should be needed for this section
+        elif (self.manualFrameDrawn == True and self.modeVar.get() == "Auton"):
+            # Destroy the Control Frame from the Left GUI:
+            self.controlFrame.destroy()
+            self.manualFrameDrawn = False
+            # Send a Log of the Toggle to Console
+            self._log("Toggled to Autonomous Mode")
+
+    # Middle Frame Functions: Console, Console Commands, and etc.
+    def _log(self, text):
+        # append to console thread-safely using after
+        ts = time.strftime("%H:%M:%S")
+        self.console.configure(state="normal")
+        self.console.insert("end", f"[{ts}] {text}\n")
+        self.console.see("end")
+        self.console.configure(state="disabled")
+
+    def _update_dashboard_widgets(self):
+        self.lbl_TEMP.config(text=str(self.telemetry["TEMP"]))
+        self.lbl_HUM.config(text=str(self.telemetry["HUM"]))
+        self.lbl_BAT.config(text=str(self.telemetry["BAT"]))
+
+    def _emergencyStopCmd(self):
+        self._log("E-Stoped the Parafoil.")
+        # Todo: Call the "deadfall" function to stop the parafoil
+        # Todo: Ask team if the GUI should go "unresponsiive" after the function
+    def _sendGPSCmd(self):
+        # Todo: Ask team for function to perform this on the system
+        # Placeholder command to test that we can send numbers
+        # Convert `inLatitude` and `inLongitude` from floats to strings
+        # Todo: Fix the below when the entry widgets are set up
+        # Place holder values until entry widgets have been set up
+        # Grab Double Values from the GUI entries
+
+
+        latStr = str(self.gpsLatitudeVar.get())
+        longStr = str(self.gpsLongitudeVar.get())
+        # latStr = str(12.111)
+        # longStr = str(-10.001)
+        self._log("Rerouted coordinates to " + latStr + "," + longStr)
+    def _periodic_ui_update(self):
+        # update plot
+        # data = list(self.temp_history)
+        # if data:
+        #     self.line.set_data(range(len(data)), data)
+        #     self.ax.set_xlim(0, max(len(data)-1, PLOT_POINTS))
+        #     ymin = min(data)
+        #     ymax = max(data)
+        #     if ymin == ymax:
+        #         ymin -= 0.5
+        #         ymax += 0.5
+        #     self.ax.set_ylim(ymin, ymax)
+        # else:
+        #     self.line.set_data([], [])
+        # self.canvas.draw_idle()
+        # ^^^ Don't need the update plot
+
+        # Run GUI Checks
+        self.toggleModeCheck()
+        self.after(GUI_UPDATE_PERIOD, self._periodic_ui_update)
+
+    def _send_text(self):
+        text = self.send_entry.get().strip()
+        if not text:
+            return
+        if self.serial_port and self.serial_port.is_open:
+            try:
+                if not text.endswith("\n"):
+                    text = text + "\n"
+                self.serial_port.write(text.encode())
+                self._log("TX: " + text.strip())
+                self.send_entry.delete(0, "end")
+            except Exception as e:
+                self._log("Send failed: " + str(e))
+        else:
+            messagebox.showwarning("Not connected", "Open a serial connection first.")
+
+    def on_close(self):
+        self.disconnect()
+        self.destroy()
+
+if __name__ == "__main__":
+    app = XBeeDashboard()
+    app.mainloop()
