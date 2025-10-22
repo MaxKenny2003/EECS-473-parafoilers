@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Parafoil_Custom")(type "Altium")(uri "C:/Users/Maxwe/Downloads/Parafoil_AGU (10-22-2025 3-13-57 PM)/Parafoil_Custom.SchLib")(options "")(descr ""))
+  (lib (name "Parafoil_AGU-altium-import")(type "KiCad")(uri "${KIPRJMOD}/Parafoil_AGU-altium-import.kicad_sym")(options "")(descr ""))
+)
