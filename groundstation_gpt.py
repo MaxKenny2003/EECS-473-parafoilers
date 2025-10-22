@@ -2,7 +2,7 @@ import serial
 import struct
 
 ser = serial.Serial(
-    port='COM6',
+    port='COM5',
     baudrate=9600,
     parity=serial.PARITY_NONE,
     stopbits=serial.STOPBITS_ONE,

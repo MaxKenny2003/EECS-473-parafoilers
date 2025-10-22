@@ -19,7 +19,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
-#include "spi.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -64,6 +63,7 @@
 
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim4;
 
@@ -72,6 +72,46 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart1_rx;
 
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for readGPS */
+osThreadId_t readGPSHandle;
+const osThreadAttr_t readGPS_attributes = {
+  .name = "readGPS",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for UpdateServos */
+osThreadId_t UpdateServosHandle;
+const osThreadAttr_t UpdateServos_attributes = {
+  .name = "UpdateServos",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for ReadCoord */
+osThreadId_t ReadCoordHandle;
+const osThreadAttr_t ReadCoord_attributes = {
+  .name = "ReadCoord",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for SendData */
+osThreadId_t SendDataHandle;
+const osThreadAttr_t SendData_attributes = {
+  .name = "SendData",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for newCoordAvailable_sem */
+osSemaphoreId_t newCoordAvailable_semHandle;
+const osSemaphoreAttr_t newCoordAvailable_sem_attributes = {
+  .name = "newCoordAvailable_sem"
+};
 /* USER CODE BEGIN PV */
 sensor_meta sensor1 = {0}; // zero-initialize the sensor metadata struct
 
@@ -87,15 +127,19 @@ volatile uint16_t gps_data_length = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_GPIO_Init(void);
-static void MX_DWT_Init(void);
-
+static void MX_SPI1_Init(void);
+void StartDefaultTask(void *argument);
+void read_GPS(void *argument);
+void updateServos(void *argument);
+void readCoord(void *argument);
+void sendData(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -218,14 +262,18 @@ int main(void)
   printf("About to initialize RTOS...\r\n");
   printf("Heap configuration: %d bytes\r\n", configTOTAL_HEAP_SIZE);
   // Check if heap_4.c is properly linked
-   /* USER CODE END 2 */
+  /* USER CODE END 2 */
 
   /* Init scheduler */
   osKernelInitialize();
-  printf("RTOS Kernel Initialized.\r\n");
+
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
+
+  /* Create the semaphores(s) */
+  /* creation of newCoordAvailable_sem */
+  newCoordAvailable_semHandle = osSemaphoreNew(1, 0, &newCoordAvailable_sem_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -239,6 +287,22 @@ int main(void)
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
+  /* Create the thread(s) */
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of readGPS */
+  readGPSHandle = osThreadNew(read_GPS, NULL, &readGPS_attributes);
+
+  /* creation of UpdateServos */
+  UpdateServosHandle = osThreadNew(updateServos, NULL, &UpdateServos_attributes);
+
+  /* creation of ReadCoord */
+  ReadCoordHandle = osThreadNew(readCoord, NULL, &ReadCoord_attributes);
+
+  /* creation of SendData */
+  SendDataHandle = osThreadNew(sendData, NULL, &SendData_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -248,11 +312,6 @@ int main(void)
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
-  printf("About to call MX_FREERTOS_Init()...\r\n");
-  MX_FREERTOS_Init();
-  printf("MX_FREERTOS_Init() complete.\r\n");
-  printf("Free heap after task creation: %lu bytes\r\n", xPortGetFreeHeapSize());
-  printf("Starting Scheduler...\r\n");
   osKernelStart();
 
   /* We should never get here as control is now taken by the scheduler */
@@ -382,7 +441,48 @@ static void MX_I2C1_Init(void)
   * @param None
   * @retval None
   */
+static void MX_SPI1_Init(void)
+{
 
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 0x0;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi1.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
 
 /**
   * @brief TIM4 Initialization Function
@@ -625,25 +725,19 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, WAKE_S1_Pin|CSN_S1_Pin|RSTN_S1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, WAKE_S1_Pin|CSN_S1_Pin|RSTN_S1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : B1_Pin PC8 */
-  GPIO_InitStruct.Pin = B1_Pin;
+  GPIO_InitStruct.Pin = B1_Pin|GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  // Interrupt on falling edge
-  GPIO_InitStruct.Pull = GPIO_PULLUP;           // Pull-up resistor
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin;
@@ -652,13 +746,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD2_Pin */
-  GPIO_InitStruct.Pin = LD2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pins : WAKE_S1_Pin CSN_S1_Pin RSTN_S1_Pin */
   GPIO_InitStruct.Pin = WAKE_S1_Pin|CSN_S1_Pin|RSTN_S1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -666,8 +753,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 6, 0);  // Priority 6 (lower than FreeRTOS max of 5)
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  /*Configure GPIO pin : LD2_Pin */
+  GPIO_InitStruct.Pin = LD2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   /* USER CODE END MX_GPIO_Init_2 */
@@ -761,6 +852,96 @@ static void MX_DWT_Init(void){
 
 /* USER CODE END 4 */
 
+/* USER CODE BEGIN Header_StartDefaultTask */
+/**
+  * @brief  Function implementing the defaultTask thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartDefaultTask */
+void StartDefaultTask(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_read_GPS */
+/**
+* @brief Function implementing the readGPS thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_read_GPS */
+void read_GPS(void *argument)
+{
+  /* USER CODE BEGIN read_GPS */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END read_GPS */
+}
+
+/* USER CODE BEGIN Header_updateServos */
+/**
+* @brief Function implementing the UpdateServos thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_updateServos */
+void updateServos(void *argument)
+{
+  /* USER CODE BEGIN updateServos */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END updateServos */
+}
+
+/* USER CODE BEGIN Header_readCoord */
+/**
+* @brief Function implementing the ReadCoord thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_readCoord */
+void readCoord(void *argument)
+{
+  /* USER CODE BEGIN readCoord */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END readCoord */
+}
+
+/* USER CODE BEGIN Header_sendData */
+/**
+* @brief Function implementing the SendData thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_sendData */
+void sendData(void *argument)
+{
+  /* USER CODE BEGIN sendData */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END sendData */
+}
+
 /**
   * @brief  Period elapsed callback in non blocking mode
   * @note   This function is called  when TIM6 interrupt took place, inside
@@ -806,6 +987,7 @@ void Error_Handler(void)
   }
 }
   /* USER CODE END Error_Handler_Debug */
+}
 
 #ifdef  USE_FULL_ASSERT
 /**

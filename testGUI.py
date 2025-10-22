@@ -21,11 +21,27 @@ DEFAULT_BAUD = 9600
 PLOT_POINTS = 100
 GUI_UPDATE_PERIOD = 50
 
+
+# Include groundstation python code to make GUI Functional
+import struct
+
+
 class XBeeDashboard(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("XBee Dashboard")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        # Define Serial Port Info Code (From Ground Station)
+        # self.ser = serial.Serial(
+        #     port='COM5',
+        #     baudrate=9600,
+        #     parity=serial.PARITY_NONE,
+        #     stopbits=serial.STOPBITS_ONE,
+        #     bytesize=serial.EIGHTBITS,
+        #     timeout=1
+        # )
+
 
         self.serial_port = None
         self.stop_event = threading.Event()
@@ -45,7 +61,9 @@ class XBeeDashboard(tk.Tk):
         self.gpsLatitudeVar = tk.DoubleVar()
         self.gpsLongitudeVar = tk.DoubleVar()
 
+        # Build UI and then Disable Widgets until we connect to Serial
         self._build_ui()
+        self._init_disable()
         self.after(500, self._periodic_ui_update)
 
     def _build_ui(self):
@@ -54,7 +72,10 @@ class XBeeDashboard(tk.Tk):
 
         # main = ttk.Frame(self)
 
-        # Top frame: connection controls
+        #***************************************#
+        # Top frame: Serial Connection Controls #
+        #***************************************#
+
         top = ttk.Frame(self)
         # top = ttk.Frame(main)
         # top.pack(side="top", fill="x", padx=8, pady=6)
@@ -99,8 +120,9 @@ class XBeeDashboard(tk.Tk):
         # Todo: For Console buttons and commands, make a seperate frame and put it at column = 1, rows = 1
         # Todo: For Map Frame, place it at column = 2 and rows = 0
 
-
-        # Left-Middle frame: dashboard widgets
+        #**********************************************#
+        # Left-Middle frame: telemetry widgets and data#
+        #**********************************************#
 
         # "Telemetry" Frame
         telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
@@ -116,15 +138,18 @@ class XBeeDashboard(tk.Tk):
             row += 1
 
         # "Mode" Frame
-        modesFrame = ttk.LabelFrame(self.left, text="Modes")
-        modesFrame.grid(column=1, row=0)
+        self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
+        self.modesFrame.grid(column=1, row=0)
 
-        auton = ttk.Radiobutton(modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
-        auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
-        manual = ttk.Radiobutton(modesFrame, text=self.modes[1], variable=self.modeVar, value="Manual")
-        manual.grid(row=2, column=2, sticky="w", padx=6, pady=6)
+        self.auton = ttk.Radiobutton(self.modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
+        self.auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
+        self.manual = ttk.Radiobutton(self.modesFrame, text=self.modes[1], variable=self.modeVar, value="Manual")
+        self.manual.grid(row=2, column=2, sticky="w", padx=6, pady=6)
 
-        # Middle frame: dashboard + console + button commands
+        #***************************************************#
+        #Middle frame: dashboard + console + button commands#
+        #***************************************************#
+
         middle = ttk.Frame(self)
         # middle.pack(side="top", fill="both", expand=True, padx=8, pady=6)
         middle.grid(column=1, row=1)
@@ -136,65 +161,59 @@ class XBeeDashboard(tk.Tk):
         self.console.pack(fill="both", expand=True, padx=4, pady=4)
   
         # Console Commands (E-Stop, Send Coordinates)
-        consoleCommandsFrame = ttk.LabelFrame(middle, text="Commands")
-        consoleCommandsFrame.grid(column=0, row=1)
+        self.consoleCommandsFrame = ttk.LabelFrame(middle, text="Commands")
+        self.consoleCommandsFrame.grid(column=0, row=1)
         # Command button to send the laptop's GPS coordinates
         # button = ttk.Button(parent, text='Okay', command=submitForm)
-        emergencyStopButton = ttk.Button(consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
-        emergencyStopButton.grid(column=0, row=0)
+        self.emergencyStopButton = ttk.Button(self.consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
+        self.emergencyStopButton.grid(column=0, row=0)
 
 
         # Send GPS Coordinates (Button and Entries)
-        sendGPSButton = ttk.Button(consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
+        self.sendGPSButton = ttk.Button(self.consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
         #sendGPSButton.pack()
-        sendGPSButton.grid(column=0, row=1)
-        sendGPSLatitudeLabel = ttk.Label(consoleCommandsFrame, text='Latitude: ')
+        self.sendGPSButton.grid(column=0, row=1)
+        sendGPSLatitudeLabel = ttk.Label(self.consoleCommandsFrame, text='Latitude: ')
         sendGPSLatitudeLabel.grid(column=1, row=1)
-        sendGPSLatitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLatitudeVar)
-        sendGPSLatitudeEntry.grid(column=2, row=1)
-        sendGPSLongitudeLabel = ttk.Label(consoleCommandsFrame, text='Longitude: ')
+        self.sendGPSLatitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.gpsLatitudeVar)
+        self.sendGPSLatitudeEntry.grid(column=2, row=1)
+        sendGPSLongitudeLabel = ttk.Label(self.consoleCommandsFrame, text='Longitude: ')
         sendGPSLongitudeLabel.grid(column=3, row=1)
-        sendGPSLongitudeEntry = ttk.Entry(consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
-        sendGPSLongitudeEntry.grid(column=4, row=1)        
+        self.sendGPSLongitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
+        self.sendGPSLongitudeEntry.grid(column=4, row=1)        
         # Right: Map and other Data
         right = ttk.Frame(self)
         # right.pack(side="left", fill="both", expand=True)
         right.grid(row=1, column=3)
 
-        # Temperature Plot 
-        # Plot area
-        # plot_frame = ttk.LabelFrame(right, text="Temperature (last values)")
-        # plot_frame.pack(side="top", fill="both", expand=True, pady=(6,0))
-
-        # self.fig = Figure(figsize=(5,2.2))
-        # self.ax = self.fig.add_subplot(111)
-        # self.ax.set_title("Temperature")
-        # self.ax.set_xlabel("samples")
-        # self.ax.set_ylabel("°C")
-        # self.line, = self.ax.plot([], [])
-        # self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
-        # self.canvas.get_tk_widget().pack(fill="both", expand=True)
-
-        # Bottom: manual send
-        # Parafoil: This will be where we send packets / specific characters to the payload
-        # bottom = ttk.Frame(self)
-        # bottom.pack(side="bottom", fill="x", padx=8, pady=6)
-
-        #ttk.Label(bottom, text="Send Packet:").pack(side="left")
-
-        # Todo: uncomment and rewrite
-        # self.send_btn = ttk.Button(middle, text="Send Packet", command=self._send_text)
-        # self.send_btn.pack(side="left")
-
-        # self.send_entry = ttk.Entry(middle, width=13)
-        # self.send_entry.pack(side="left", padx=6)
-        # self.send_entry.bind("<Return>", lambda e: self._send_text())
-            # Left-Middle Frame Functions: Manual/Auton Mode switches
-
-
+    def _init_disable(self):
+        # Disable several buttons and widgets upon start up
+        # Disable Left Frame Buttons
+        # Disable Example:  self.connect_btn.config(state="disabled")
+        self.manual.config(state="disabled")
+        self.auton.config(state="disabled")
+        # Disable Middle Frame Buttons
+        self.emergencyStopButton.config(state="disabled")
+        self.sendGPSButton.config(state="disabled")
+        self.sendGPSLatitudeEntry.config(state="disabled")
+        self.sendGPSLongitudeEntry.config(state="disabled")
+        
+    def _init_enable(self):
+        # Enable several buttons and widegets upon start up
+        # Enable Left Frame Buttons
+        self.manual.config(state="normal")
+        self.auton.config(state="normal")
+        # Enable Middle Frame Buttons
+        self.emergencyStopButton.config(state="normal")
+        self.sendGPSButton.config(state="normal")
+        self.sendGPSLatitudeEntry.config(state="normal")
+        self.sendGPSLongitudeEntry.config(state="normal")
+        
     
-
-    # Functions for Top Frame: Serial, Connection, and others
+        
+    ######################################################
+    # Top Frame Functions: Serial, Connection, and others#
+    ######################################################
 
     def _scan_ports(self):
         ports = [p.device for p in serial.tools.list_ports.comports()]
@@ -219,15 +238,28 @@ class XBeeDashboard(tk.Tk):
             return
 
         try:
-            self.serial_port = serial.Serial(port, baud, timeout=0.5)
+            self.serial_port = serial.Serial(
+                port=port,
+                baudrate=baud,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                timeout=1   
+            )
         except Exception as e:
             messagebox.showerror("Open port failed", f"Could not open {port}: {e}")
             return
-
-        self.connect_btn.config(state="disabled")
-        self.disconnect_btn.config(state="normal")
-        self.scan_btn.config(state="disabled")
-        self._log(f"Connected to {port} @ {baud}")
+        if(self.serial_port.is_open):
+            # Only enable buttons if the port we connected to is open
+            self.connect_btn.config(state="disabled")
+            self.disconnect_btn.config(state="normal")
+            self.scan_btn.config(state="disabled")
+            self._init_enable()
+            self.serialConnectLog()
+        else:
+            self._log("Error: port not opened")
+            print("Error: port not opened")
+            exit(1)
         self.stop_event.clear()
         self.rx_thread = threading.Thread(target=self._rx_worker, daemon=True)
         self.rx_thread.start()
@@ -243,6 +275,7 @@ class XBeeDashboard(tk.Tk):
         self.connect_btn.config(state="normal")
         self.disconnect_btn.config(state="disabled")
         self.scan_btn.config(state="normal")
+        self._init_disable()
         self._log("Disconnected")
 
     def _rx_worker(self):
@@ -322,7 +355,39 @@ class XBeeDashboard(tk.Tk):
             # Send a Log of the Toggle to Console
             self._log("Toggled to Autonomous Mode")
 
-    # Middle Frame Functions: Console, Console Commands, and etc.
+    def serialConnectLog(self):
+        self._log(f"{self.serial_port.name} serial port is opened")
+        self._log(f"Connected to {self.serial_port.port} @ {self.serial_port.baudrate}")
+        self._log("\nPARAFOIL GROUND STATION")
+        self._log("\nCommands:")
+        self._log("  coord  - Send target GPS coordinates using the button in 'Commands' Frame (auto mode)")
+        self._log("  Latitude Range: [-90, 90], Longitude Range: [-180, 180]")
+        self._log("  L      - Manual control: Turn LEFT")
+        self._log("  R      - Manual control: Turn RIGHT")
+        self._log("  S      - Manual control: STOP servo")
+        self._log("  A      - Switch to AUTO (GPS navigation) mode")
+        self._log("  M      - Switch to MANUAL OVERRIDE mode")
+        self._log("  exit   - Close serial port and quit")
+        self._log("=" * 31 + "\n")
+        
+    def _manualTurnLeft(self):
+        data = b'L'+ bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual LEFT command sent")
+    
+    def _manualTurnRight(self):
+        data = b'R' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual RIGHT command sent")
+
+    # To-Do Port Manual and Auton Functions
+    # To-Do Connect manualTurnLeft and manualTurnRight to their respective buttons
+
+
+    ##############################################################
+    # Middle Frame Functions: Console, Console Commands, and etc.#
+    ##############################################################
+
     def _log(self, text):
         # append to console thread-safely using after
         ts = time.strftime("%H:%M:%S")
@@ -340,20 +405,73 @@ class XBeeDashboard(tk.Tk):
         self._log("E-Stoped the Parafoil.")
         # Todo: Call the "deadfall" function to stop the parafoil
         # Todo: Ask team if the GUI should go "unresponsiive" after the function
+   
+    def consoleValidateCoordinates(self, lat, lon):
+        """Validate latitude and longitude ranges."""
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+            
+            if not (-90 <= lat_f <= 90):
+                # print(f"Error: Latitude must be between -90 and 90")
+                self._log("Error: Latitude must be between -90 and 90")
+                return None, None
+            
+            if not (-180 <= lon_f <= 180):
+                # print(f"Error: Longitude must be between -180 and 180")
+                self._log("Error: Longitude must be between -180 and 180")
+                return None, None
+            
+            return lat_f, lon_f
+        except ValueError:
+            # print("Error: Invalid number format")
+            self._log("Error: Invalid number format")
+            return None, None
+    def consoleCoordsToFixedPoint(self, lat, lon, scale=10000000):
+        latFixed = int(lat*scale)
+        longFixed = int(lon*scale)
+        return latFixed, longFixed
+
     def _sendGPSCmd(self):
-        # Todo: Ask team for function to perform this on the system
-        # Placeholder command to test that we can send numbers
-        # Convert `inLatitude` and `inLongitude` from floats to strings
-        # Todo: Fix the below when the entry widgets are set up
         # Place holder values until entry widgets have been set up
         # Grab Double Values from the GUI entries
-
-
         latStr = str(self.gpsLatitudeVar.get())
         longStr = str(self.gpsLongitudeVar.get())
+        # Validate Coordinates
+        latF, longF = self.consoleValidateCoordinates(latStr, longStr)
+        if latF is None or longF is None:
+            return
+        
+        # Convert to fixed-point
+        SCALE = 10000000
+        latFixed, longFixed = self.consoleCoordsToFixedPoint(latF, longF, SCALE);
+        
+        # Check bounds for fixed point
+        if not (-900000000 <= latFixed <= 900000000):
+            self._log("Error: Latitude out of fixed-point range")
+            return
+        if not (-1800000000 <= longFixed <= 1800000000):
+            self._log("Error: Longitude out of fixed-point range")
+            return
+
+        # Pack both fixed-point variables as 32-bit integers
+        latBytes = struct.pack('>i', latFixed)
+        longBytes = struct.pack('>i', longFixed)
+
+        # Print relevant conversion information
+        self._log(f"Original: Latitude={latF}, Longitude={longF}")
+        self._log(f"Fixed-point: Lat={latFixed}, Lon={longFixed}")
+        self._log(f"Lat bytes: {latBytes.hex()}")
+        self._log(f"Lon bytes: {longBytes.hex()}")
+        self._log(f"Reconstructed: Lat={latFixed/SCALE}, Lon={longFixed/SCALE}")
+        
+        # Create Packet to send:
+        data = b'C' + latBytes + longBytes
+        self._log(f"Sending {len(data)} bytes: {data.hex()}")
+        self.serial_port.write(data)
+        self._log("Rerouted coordinates to " + latStr + "," + longStr)
         # latStr = str(12.111)
         # longStr = str(-10.001)
-        self._log("Rerouted coordinates to " + latStr + "," + longStr)
     def _periodic_ui_update(self):
         # update plot
         # data = list(self.temp_history)
@@ -395,6 +513,19 @@ class XBeeDashboard(tk.Tk):
         self.disconnect()
         self.destroy()
 
+    def _sendGeneralCommand(self, cmd):
+        # Copy Matteo's if statement tree based on the input command being send
+        # In the spirit of mimicking the terminal, I will have sanity print to show what cmd was just sent
+        self._log("Command Sent: " + cmd)
+        if cmd == "exit":
+            self._log("Closing Serial Port...")
+            self.serial_port.close()
+            self._log("Serial Port Closed.")
+        # elif cmd == "coord":
+        #     # Grab 
+
 if __name__ == "__main__":
     app = XBeeDashboard()
     app.mainloop()
+
+
