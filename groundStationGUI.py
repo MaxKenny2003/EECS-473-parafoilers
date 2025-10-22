@@ -208,6 +208,9 @@ class XBeeDashboard(tk.Tk):
         self.sendGPSButton.config(state="normal")
         self.sendGPSLatitudeEntry.config(state="normal")
         self.sendGPSLongitudeEntry.config(state="normal")
+        # Lastly, Enable the Auton Mode by default
+        self._log("Enabling Auton Mode by Default")
+        self._setToAuto()
         
     
         
@@ -326,6 +329,12 @@ class XBeeDashboard(tk.Tk):
             # not telemetry or parse error — ignore for dashboard
             pass
 
+
+
+    #################################################
+    # Left-Middle Frame Functions: Telemetry, Modes #
+    #################################################
+
     # Function to switch to manual mode, redraw control buttons, etc
     # These have been written here to provide scope of upper function to those below
     def toggleModeCheck(self):
@@ -338,11 +347,13 @@ class XBeeDashboard(tk.Tk):
             self.controlFrame = ttk.LabelFrame(self.left, text="Manual Controls")
             self.controlFrame.grid(column=0, row=1)
             # Draw Left and Right buttons
-            turnLeftButtom = ttk.Button(self.controlFrame, text="Turn Left")
-            turnLeftButtom.grid(column=0, row = 0)
-            turnRightButton = ttk.Button(self.controlFrame, text="Turn Right")
-            turnRightButton.grid(column=1, row=0)
+            self.turnLeftButton = ttk.Button(self.controlFrame, text="Turn Left", command=self._manualTurnLeft)
+            self.turnLeftButton.grid(column=0, row = 0)
+            self.turnRightButton = ttk.Button(self.controlFrame, text="Turn Right", command=self._manualTurnRight)
+            self.turnRightButton.grid(column=1, row=0)
             self.manualFrameDrawn = True
+            # Send a Packet to set the System to Manual Mode
+            self._setToManual()
             # Send a Log of the Toggle to Console
             self._log("Toggled to Manual Mode")
             
@@ -352,6 +363,8 @@ class XBeeDashboard(tk.Tk):
             # Destroy the Control Frame from the Left GUI:
             self.controlFrame.destroy()
             self.manualFrameDrawn = False
+            # Send a Packet to set the System to Manual Mode
+            self._setToAuto()
             # Send a Log of the Toggle to Console
             self._log("Toggled to Autonomous Mode")
 
@@ -369,7 +382,17 @@ class XBeeDashboard(tk.Tk):
         self._log("  M      - Switch to MANUAL OVERRIDE mode")
         self._log("  exit   - Close serial port and quit")
         self._log("=" * 31 + "\n")
-        
+    
+    def _setToAuto(self):
+        data = b'A' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ AUTO (GPS navigation) mode command sent")
+    
+    def _setToManual(self):
+        data = b'M' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ MANUAL OVERRIDE mode command sent")
+
     def _manualTurnLeft(self):
         data = b'L'+ bytes(8)
         self.serial_port.write(data)
@@ -379,9 +402,6 @@ class XBeeDashboard(tk.Tk):
         data = b'R' + bytes(8)
         self.serial_port.write(data)
         self._log("→ Manual RIGHT command sent")
-
-    # To-Do Port Manual and Auton Functions
-    # To-Do Connect manualTurnLeft and manualTurnRight to their respective buttons
 
 
     ##############################################################
@@ -402,8 +422,10 @@ class XBeeDashboard(tk.Tk):
         self.lbl_BAT.config(text=str(self.telemetry["BAT"]))
 
     def _emergencyStopCmd(self):
+        data = b'S' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual STOP command sent")
         self._log("E-Stoped the Parafoil.")
-        # Todo: Call the "deadfall" function to stop the parafoil
         # Todo: Ask team if the GUI should go "unresponsiive" after the function
    
     def consoleValidateCoordinates(self, lat, lon):
