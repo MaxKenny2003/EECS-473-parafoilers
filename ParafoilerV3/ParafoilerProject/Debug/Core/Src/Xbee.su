@@ -1,0 +1,12 @@
+../Drivers/CMSIS/Include/core_cm7.h:1921:26:__NVIC_GetEnableIRQ	16	static
+../Core/Src/Xbee.c:26:6:xbee_init	24	static
+../Core/Src/Xbee.c:52:6:xbee_send_data	16	static
+../Core/Src/Xbee.c:57:6:xbee_receive_data	16	static
+../Core/Src/Xbee.c:62:6:HAL_UART_RxCpltCallback	24	static
+../Core/Src/Xbee.c:85:6:HAL_UART_ErrorCallback	32	static
+../Core/Src/Xbee.c:129:6:HAL_UART_AbortReceiveCpltCallback	16	static
+../Core/Src/Xbee.c:146:6:handle_cmd	24	static
+../Core/Src/Xbee.c:193:10:xbee_get_interrupt_count	4	static
+../Core/Src/Xbee.c:197:10:xbee_get_coord_count	4	static
+../Core/Src/Xbee.c:201:10:xbee_get_error_count	4	static
+../Core/Src/Xbee.c:205:10:xbee_get_restart_count	4	static

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 xbee_dashboard.py
-Requires: pyserial, matplotlib
-pip install pyserial matplotlib
 """
 
 import tkinter as tk
@@ -12,10 +10,10 @@ import serial.tools.list_ports
 import threading
 import time
 from collections import deque
-import matplotlib
-matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
+# import matplotlib
+# matplotlib.use("TkAgg")
+# from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+# from matplotlib.figure import Figure
 
 DEFAULT_BAUD = 9600
 PLOT_POINTS = 100
@@ -29,19 +27,8 @@ import struct
 class XBeeDashboard(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("XBee Dashboard")
+        self.title("Groundstation XBee Dashboard")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
-
-        # Define Serial Port Info Code (From Ground Station)
-        # self.ser = serial.Serial(
-        #     port='COM5',
-        #     baudrate=9600,
-        #     parity=serial.PARITY_NONE,
-        #     stopbits=serial.STOPBITS_ONE,
-        #     bytesize=serial.EIGHTBITS,
-        #     timeout=1
-        # )
-
 
         self.serial_port = None
         self.stop_event = threading.Event()
@@ -50,6 +37,11 @@ class XBeeDashboard(tk.Tk):
         # Telemetry values 
         self.telemetry = {"TEMP": "N/A", "HUM": "N/A", "BAT": "N/A", "ALTITUDE": "N/A"}
         self.temp_history = deque(maxlen=PLOT_POINTS)
+
+        # self.telemetryAccelDict = {"Ax": "N\A", "Ay" : "N\A", "Az" : "N\A"}
+        # self.telemetryGyroDict = {"Roll" : "N\A", "Pitch" : "N\A", "Yaw" : "N\A"}
+        # self.telemetryMagDict = {"Mx" : "N\A", "My" : "N\A", "Mz" : "N\A"}
+        # self.telemetryGPSDict = {"Latitude" : "N\A", "Longitude" : "N\A", "Altitude" : "N\A"}
 
         # Control Mode Radiobutton Labels
         self.modes = ["Auton", "Manual"]
@@ -117,14 +109,14 @@ class XBeeDashboard(tk.Tk):
         # Reserve the following spots in the grid for each frame:
         # For Dashboard and DashboardTwo, use column = 0, and then rows=0 and 1
         # For Console use column = 1 and rows = 0
-        # Todo: For Console buttons and commands, make a seperate frame and put it at column = 1, rows = 1
-        # Todo: For Map Frame, place it at column = 2 and rows = 0
+        # For Console buttons and commands, make a seperate frame and put it at column = 1, rows = 1
+        # For Map Frame, place it at column = 2 and rows = 0
 
         #**********************************************#
         # Left-Middle frame: telemetry widgets and data#
         #**********************************************#
 
-        # "Telemetry" Frame
+        # Telemetry Frames
         telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
         # dash_frame.pack(side="left", fill="y", padx=(0,8))
         telemetryFrame.grid(column=0, row=0, ipady=12)
@@ -137,9 +129,18 @@ class XBeeDashboard(tk.Tk):
             setattr(self, f"lbl_{key}", lbl)
             row += 1
 
+        telemetryAccelFrame = ttk.LabelFrame(self.left, text= "Accelerometer")
+        telemetryAccelFrame.grid(column=1, row=0, ipady=6)
+        telemetryGyroFrame = ttk.LabelFrame(self.left, text= "Gyroscope")
+        telemetryGyroFrame.grid(column=2, row=0, ipady=6)
+        telemetryMagFrame = ttk.LabelFrame(self.left, text = "Magnometer")
+        telemetryMagFrame.grid(column=3, row=0, ipady=6)
+        telemetryGPSFrame = ttk.LabelFrame(self.left, text = "GPS")
+        telemetryGPSFrame.grid(column=4, row=0, ipady=6)
+
         # "Mode" Frame
         self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
-        self.modesFrame.grid(column=1, row=0)
+        self.modesFrame.grid(column=5, row=0)
 
         self.auton = ttk.Radiobutton(self.modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
         self.auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
@@ -494,25 +495,18 @@ class XBeeDashboard(tk.Tk):
         self._log("Rerouted coordinates to " + latStr + "," + longStr)
         # latStr = str(12.111)
         # longStr = str(-10.001)
+    def _rxSensorData(self):
+        rxData = self.serial_port.read(8)
+        # Grab specfic data from the sensors for each metric
+        # For now, just print out data that is being sent to the console:
+        self._log(f"Received Sensor Data: {rxData}")
     def _periodic_ui_update(self):
-        # update plot
-        # data = list(self.temp_history)
-        # if data:
-        #     self.line.set_data(range(len(data)), data)
-        #     self.ax.set_xlim(0, max(len(data)-1, PLOT_POINTS))
-        #     ymin = min(data)
-        #     ymax = max(data)
-        #     if ymin == ymax:
-        #         ymin -= 0.5
-        #         ymax += 0.5
-        #     self.ax.set_ylim(ymin, ymax)
-        # else:
-        #     self.line.set_data([], [])
-        # self.canvas.draw_idle()
-        # ^^^ Don't need the update plot
 
         # Run GUI Checks
         self.toggleModeCheck()
+        # If we are currently connected, then run the RX Sensor Data Function
+        # if(self.serial_port.is_open):
+        #     self._rxSensorData()
         self.after(GUI_UPDATE_PERIOD, self._periodic_ui_update)
 
     def _send_text(self):
@@ -534,17 +528,6 @@ class XBeeDashboard(tk.Tk):
     def on_close(self):
         self.disconnect()
         self.destroy()
-
-    def _sendGeneralCommand(self, cmd):
-        # Copy Matteo's if statement tree based on the input command being send
-        # In the spirit of mimicking the terminal, I will have sanity print to show what cmd was just sent
-        self._log("Command Sent: " + cmd)
-        if cmd == "exit":
-            self._log("Closing Serial Port...")
-            self.serial_port.close()
-            self._log("Serial Port Closed.")
-        # elif cmd == "coord":
-        #     # Grab 
 
 if __name__ == "__main__":
     app = XBeeDashboard()

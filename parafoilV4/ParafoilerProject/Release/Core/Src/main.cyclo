@@ -1,0 +1,9 @@
+../Core/Src/main.c:107:6:delay_Us	2
+../Core/Src/main.c:673:1:__io_putchar	1
+../Core/Src/main.c:679:6:HAL_UARTEx_RxEventCallback	37
+../Core/Src/main.c:713:6:vApplicationStackOverflowHook	2
+../Core/Src/main.c:730:6:vApplicationMallocFailedHook	1
+../Core/Src/main.c:763:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:781:6:Error_Handler	1
+../Core/Src/main.c:275:6:SystemClock_Config	3
+../Core/Src/main.c:120:5:main	20
