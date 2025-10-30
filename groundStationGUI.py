@@ -35,13 +35,18 @@ class XBeeDashboard(tk.Tk):
         self.rx_thread = None
 
         # Telemetry values 
-        self.telemetry = {"TEMP": "N/A", "HUM": "N/A", "BAT": "N/A", "ALTITUDE": "N/A"}
-        self.temp_history = deque(maxlen=PLOT_POINTS)
-
-        # self.telemetryAccelDict = {"Ax": "N\A", "Ay" : "N\A", "Az" : "N\A"}
-        # self.telemetryGyroDict = {"Roll" : "N\A", "Pitch" : "N\A", "Yaw" : "N\A"}
-        # self.telemetryMagDict = {"Mx" : "N\A", "My" : "N\A", "Mz" : "N\A"}
-        # self.telemetryGPSDict = {"Latitude" : "N\A", "Longitude" : "N\A", "Altitude" : "N\A"}
+        self.telemetryAccelXVar = tk.DoubleVar()
+        self.telemetryAccelYVar = tk.DoubleVar()
+        self.telemetryAccelZVar = tk.DoubleVar()
+        self.telemetryGyroRollVar  = tk.DoubleVar()
+        self.telemetryGyroPitchVar = tk.DoubleVar()
+        self.telemetryGyroYawVar   = tk.DoubleVar()
+        self.telemetryGPSLatVar = tk.DoubleVar()
+        self.telemetryGPSLonVar = tk.DoubleVar()
+        self.telemetryGPSAltVar = tk.DoubleVar()
+        self.telemetryEulerIVar = tk.DoubleVar() 
+        self.telemetryEulerKVar = tk.DoubleVar()
+        self.telemetryEulerJVar = tk.DoubleVar()
 
         # Control Mode Radiobutton Labels
         self.modes = ["Auton", "Manual"]
@@ -117,31 +122,73 @@ class XBeeDashboard(tk.Tk):
         #**********************************************#
 
         # Telemetry Frames
-        telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
+        self.telemetryFrame = ttk.LabelFrame(self.left, text="Telemetry")
         # dash_frame.pack(side="left", fill="y", padx=(0,8))
-        telemetryFrame.grid(column=0, row=0, ipady=12)
+        self.telemetryFrame.grid(column=0, row=0, ipady=12)
 
-        row = 0
-        for key in ["TEMP", "HUM", "BAT", "ALTITUDE"]:
-            ttk.Label(telemetryFrame, text=f"{key}:", font=("TkDefaultFont", 10)).grid(row=row, column=0, sticky="w", padx=6, pady=6)
-            lbl = ttk.Label(telemetryFrame, text=self.telemetry[key], font=("TkDefaultFont", 12, "bold"))
-            lbl.grid(row=row, column=1, sticky="w", padx=6, pady=6)
-            setattr(self, f"lbl_{key}", lbl)
-            row += 1
+        # Accelerometer (Telemetry) Frame
+        self.telemetryAccelFrame = ttk.LabelFrame(self.telemetryFrame, text= "Accelerometer")
+        self.telemetryAccelFrame.grid(column=0, row=0, ipady=6)
+        # Accelerometer Labels: Make the non-variable labels floating variables, since they won't need to change
+        ttk.Label(self.telemetryAccelFrame, text='Acceleration X: ').grid(column=0, row=0)
+        ttk.Label(self.telemetryAccelFrame, text='Acceleration Y: ').grid(column=0, row=1)
+        ttk.Label(self.telemetryAccelFrame, text='Acceleration Z: ').grid(column=0, row=2)
+        ttk.Label(self.telemetryAccelFrame, text=' m/s^2').grid(column=2, row=0)
+        ttk.Label(self.telemetryAccelFrame, text=' m/s^2').grid(column=2, row=1)
+        ttk.Label(self.telemetryAccelFrame, text=' m/s^2').grid(column=2, row=2)
+        # Accelerometer Labels: Display the text variable labels
+        self.telemetryAccelXVarLabel = ttk.Label(self.telemetryAccelFrame, textvariable=self.telemetryAccelXVar).grid(column=1, row=0)
+        self.telemetryAccelYVarLabel = ttk.Label(self.telemetryAccelFrame, textvariable=self.telemetryAccelYVar).grid(column=1, row=1)
+        self.telemetryAccelZVarLabel = ttk.Label(self.telemetryAccelFrame, textvariable=self.telemetryAccelZVar).grid(column=1, row=2)
 
-        telemetryAccelFrame = ttk.LabelFrame(self.left, text= "Accelerometer")
-        telemetryAccelFrame.grid(column=1, row=0, ipady=6)
-        telemetryGyroFrame = ttk.LabelFrame(self.left, text= "Gyroscope")
-        telemetryGyroFrame.grid(column=2, row=0, ipady=6)
-        telemetryMagFrame = ttk.LabelFrame(self.left, text = "Magnometer")
-        telemetryMagFrame.grid(column=3, row=0, ipady=6)
-        telemetryGPSFrame = ttk.LabelFrame(self.left, text = "GPS")
-        telemetryGPSFrame.grid(column=4, row=0, ipady=6)
+        # Gyroscope (Telemetry) Frame
+        self.telemetryGyroFrame = ttk.LabelFrame(self.telemetryFrame, text= "Gyroscope")
+        self.telemetryGyroFrame.grid(column=1, row=0, ipady=6)
+        # Gyroscope Labels: Non-variable labels
+        ttk.Label(self.telemetryGyroFrame, text='Roll: ').grid(column=0, row=0)
+        ttk.Label(self.telemetryGyroFrame, text='Pitch: ').grid(column=0, row=1)
+        ttk.Label(self.telemetryGyroFrame, text='Yaw: ').grid(column=0, row=2)
+        # todo: not sure if we are measuring in degrees or radians. Ask Max later
+        ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=0)
+        ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=1)
+        ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=2)
+        # Gyroscope Labels: Display the text variable labels
+        self.telemetryGyroRollVarLabel = ttk.Label(self.telemetryGyroFrame, textvariable=self.telemetryGyroRollVar).grid(column=1, row=0)
+        self.telemetryGyroPitchVarLabel = ttk.Label(self.telemetryGyroFrame, textvariable=self.telemetryGyroPitchVar).grid(column=1, row=1)
+        self.telemetryGyroYawVarLabel = ttk.Label(self.telemetryGyroFrame, textvariable=self.telemetryGyroYawVar).grid(column=1, row=2)
 
+        # GPS (Telemetry) Frame
+        self.telemetryGPSFrame = ttk.LabelFrame(self.telemetryFrame, text = "GPS")
+        self.telemetryGPSFrame.grid(column=0, row=1, ipady=6)
+        # GPS Labels: Non-variable labels
+        ttk.Label(self.telemetryGPSFrame, text='Latitude: ').grid(column=0, row=0)
+        ttk.Label(self.telemetryGPSFrame, text='Longitude: ').grid(column=0, row=1)
+        ttk.Label(self.telemetryGPSFrame, text='Altitude: ').grid(column=0, row=2)
+        ttk.Label(self.telemetryGPSFrame, text='°').grid(column=2, row=0)
+        ttk.Label(self.telemetryGPSFrame, text='°').grid(column=2, row=1)
+        ttk.Label(self.telemetryGPSFrame, text='m').grid(column=2, row=2)
+        # GPS Labels: Display the text variable label
+        self.telemetryGPSLatVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLatVar).grid(column=1, row=0)
+        self.telemetryGPSLonVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLonVar).grid(column=1, row=1)
+        self.telemetryGPSAltVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSAltVar).grid(column=1, row=2)
+
+        # Euler Angles (Telemetry) Frame
+        self.telemetryEulerFrame = ttk.LabelFrame(self.telemetryFrame, text = "Euler Angles")
+        self.telemetryEulerFrame.grid(column=1, row=1, ipady=6)
+        # Euler Angles Labels: Non-variable labels
+        ttk.Label(self.telemetryEulerFrame, text= 'I Angle: ').grid(column=0, row=0)
+        ttk.Label(self.telemetryEulerFrame, text= 'J Angle: ').grid(column=0, row=1)
+        ttk.Label(self.telemetryEulerFrame, text= 'K Angle: ').grid(column=0, row=2)
+        ttk.Label(self.telemetryEulerFrame, text= ' rad').grid(column=2, row=0)
+        ttk.Label(self.telemetryEulerFrame, text= ' rad').grid(column=2, row=1)
+        ttk.Label(self.telemetryEulerFrame, text= ' rad').grid(column=2, row=2)
+        # Euler Angles Labels: Display the text variable label
+        self.telemetryEulerIVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerIVar).grid(column=1, row=0)
+        self.telemetryEulerJVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerJVar).grid(column=1, row=1)
+        self.telemetryEulerKVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerKVar).grid(column=1, row=2)
         # "Mode" Frame
         self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
         self.modesFrame.grid(column=5, row=0)
-
         self.auton = ttk.Radiobutton(self.modesFrame, text=self.modes[0], variable=self.modeVar, value="Auton")
         self.auton.grid(row=1, column=2, sticky="w", padx=6, pady=6)
         self.manual = ttk.Radiobutton(self.modesFrame, text=self.modes[1], variable=self.modeVar, value="Manual")
@@ -172,7 +219,6 @@ class XBeeDashboard(tk.Tk):
 
         # Send GPS Coordinates (Button and Entries)
         self.sendGPSButton = ttk.Button(self.consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
-        #sendGPSButton.pack()
         self.sendGPSButton.grid(column=0, row=1)
         sendGPSLatitudeLabel = ttk.Label(self.consoleCommandsFrame, text='Latitude: ')
         sendGPSLatitudeLabel.grid(column=1, row=1)
@@ -186,6 +232,10 @@ class XBeeDashboard(tk.Tk):
         right = ttk.Frame(self)
         # right.pack(side="left", fill="both", expand=True)
         right.grid(row=1, column=3)
+
+        # RX Data Button (Temporary until RX is on officially looped)
+        self.rxDataButton = ttk.Button(self.consoleCommandsFrame, text = 'Receive Data from TX', command=self._rxSensorData)
+        self.rxDataButton.grid(row=2, column=0)
 
     def _init_disable(self):
         # Disable several buttons and widgets upon start up
@@ -264,9 +314,9 @@ class XBeeDashboard(tk.Tk):
             self._log("Error: port not opened")
             print("Error: port not opened")
             exit(1)
-        self.stop_event.clear()
-        self.rx_thread = threading.Thread(target=self._rx_worker, daemon=True)
-        self.rx_thread.start()
+        # self.stop_event.clear()
+        # self.rx_thread = threading.Thread(target=self._rx_worker, daemon=True)
+        # self.rx_thread.start()
 
     def disconnect(self):
         self.stop_event.set()
@@ -282,53 +332,55 @@ class XBeeDashboard(tk.Tk):
         self._init_disable()
         self._log("Disconnected")
 
-    def _rx_worker(self):
-        buff = bytearray()
-        while not self.stop_event.is_set():
-            try:
-                if self.serial_port is None:
-                    break
-                data = self.serial_port.read(128)
-                if data:
-                    buff.extend(data)
-                    # handle lines
-                    while b'\n' in buff:
-                        idx = buff.index(b'\n')
-                        line = buff[:idx+1].decode(errors='replace').strip()
-                        buff = buff[idx+1:]
-                        self._handle_line(line)
-                else:
-                    time.sleep(0.01)
-            except Exception as e:
-                self._log(f"Serial read error: {e}")
-                time.sleep(0.5)
+    # Comment out the Thread Functions for now. 
+    # See if it will be useful later
+    # def _rx_worker(self):
+    #     buff = bytearray()
+    #     while not self.stop_event.is_set():
+    #         try:
+    #             if self.serial_port is None:
+    #                 break
+    #             data = self.serial_port.read(128)
+    #             if data:
+    #                 buff.extend(data)
+    #                 # handle lines
+    #                 while b'\n' in buff:
+    #                     idx = buff.index(b'\n')
+    #                     line = buff[:idx+1].decode(errors='replace').strip()
+    #                     buff = buff[idx+1:]
+    #                     self._handle_line(line)
+    #             else:
+    #                 time.sleep(0.01)
+    #         except Exception as e:
+    #             self._log(f"Serial read error: {e}")
+    #             time.sleep(0.5)
 
-    def _handle_line(self, line):
-        # Display raw line
-        self._log("RX: " + line)
+    # def _handle_line(self, line):
+    #     # Display raw line
+    #     self._log("RX: " + line)
 
-        # Expect telemetry as KEY=VALUE;KEY=VALUE;...\n
-        try:
-            parts = line.strip().split(';')
-            changed = False
-            for p in parts:
-                if '=' in p:
-                    k,v = p.split('=',1)
-                    k=k.strip().upper()
-                    v=v.strip()
-                    if k in self.telemetry:
-                        self.telemetry[k] = v
-                        changed = True
-                        if k == "TEMP":
-                            try:
-                                self.temp_history.append(float(v))
-                            except:
-                                pass
-            if changed:
-                self._update_dashboard_widgets()
-        except Exception as e:
-            # not telemetry or parse error — ignore for dashboard
-            pass
+    #     # Expect telemetry as KEY=VALUE;KEY=VALUE;...\n
+    #     try:
+    #         parts = line.strip().split(';')
+    #         changed = False
+    #         for p in parts:
+    #             if '=' in p:
+    #                 k,v = p.split('=',1)
+    #                 k=k.strip().upper()
+    #                 v=v.strip()
+    #                 if k in self.telemetry:
+    #                     self.telemetry[k] = v
+    #                     changed = True
+    #                     if k == "TEMP":
+    #                         try:
+    #                             self.temp_history.append(float(v))
+    #                         except:
+    #                             pass
+    #         if changed:
+    #             self._update_dashboard_widgets()
+    #     except Exception as e:
+    #         # not telemetry or parse error — ignore for dashboard
+    #         pass
 
 
 
@@ -417,10 +469,10 @@ class XBeeDashboard(tk.Tk):
         self.console.see("end")
         self.console.configure(state="disabled")
 
-    def _update_dashboard_widgets(self):
-        self.lbl_TEMP.config(text=str(self.telemetry["TEMP"]))
-        self.lbl_HUM.config(text=str(self.telemetry["HUM"]))
-        self.lbl_BAT.config(text=str(self.telemetry["BAT"]))
+    # def _update_dashboard_widgets(self):
+        # self.lbl_TEMP.config(text=str(self.telemetry["TEMP"]))
+        # self.lbl_HUM.config(text=str(self.telemetry["HUM"]))
+        # self.lbl_BAT.config(text=str(self.telemetry["BAT"]))
 
     def _emergencyStopCmd(self):
         data = b'S' + bytes(8)
@@ -496,10 +548,17 @@ class XBeeDashboard(tk.Tk):
         # latStr = str(12.111)
         # longStr = str(-10.001)
     def _rxSensorData(self):
-        rxData = self.serial_port.read(8)
+        # rxData = self.serial_port.read(64)
+        # Alt method to read serial data
+        rxData = self.serial_port.readline()
+        rxDataFloat = struct.unpack('f', rxData[0:4])
+        rxDataFloat2 = struct.unpack('f', rxData[4:8])
+        # rxDataStr = rxData.decode('utf-8').strip()
         # Grab specfic data from the sensors for each metric
         # For now, just print out data that is being sent to the console:
         self._log(f"Received Sensor Data: {rxData}")
+        self._log(f"Received Sensor Data as Floats: {rxDataFloat}")
+        self._log(f"Received Sensor Data as Floats: {rxDataFloat2}")
     def _periodic_ui_update(self):
 
         # Run GUI Checks
