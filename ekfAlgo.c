@@ -163,13 +163,6 @@ void ParafoilEKF_Predict(ParafoilEKF *ekf,
     // --- 3. Propagate covariance matrix P ---
     // P(k+1) = P(k) + dt * (A*P + P*A' + Q)
     // Where A is the state transition Jacobian
-    //      [ 0 0 0 1 0 0 0 ]
-    //      [ 0 0 0 0 1 0 0 ]
-    //      [ 0 0 0 0 0 1 0 ]
-    // A =  [ 0 0 0 0 0 0 0 ]
-    //      [ 0 0 0 0 0 0 0 ]
-    //      [ 0 0 0 0 0 0 0 ]
-    //      [ 0 0 0 0 0 0 0 ]
     // (A*P + P*A')_ij = A_ik*P_kj + P_ik*A_jk
     
     float AP_plus_PAT[EKF_NUM_STATES][EKF_NUM_STATES] = {0};
