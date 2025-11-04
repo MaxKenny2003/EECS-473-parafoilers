@@ -10,6 +10,7 @@ import serial.tools.list_ports
 import threading
 import time
 from collections import deque
+from PIL import ImageTk, Image
 # import matplotlib
 # matplotlib.use("TkAgg")
 # from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -34,7 +35,7 @@ class XBeeDashboard(tk.Tk):
         self.stop_event = threading.Event()
         self.rx_thread = None
 
-        # Telemetry values 
+        # Telemetry Values 
         self.telemetryAccelXVar = tk.DoubleVar()
         self.telemetryAccelYVar = tk.DoubleVar()
         self.telemetryAccelZVar = tk.DoubleVar()
@@ -48,15 +49,16 @@ class XBeeDashboard(tk.Tk):
         self.telemetryEulerKVar = tk.DoubleVar()
         self.telemetryEulerJVar = tk.DoubleVar()
 
+        # Controls Values
+        self.gpsLatitudeVar = tk.DoubleVar()
+        self.gpsLongitudeVar = tk.DoubleVar()
+
         # Control Mode Radiobutton Labels
         self.modes = ["Auton", "Manual"]
         # Create a shared control variable for both Radiobuttons
         self.modeVar = tk.StringVar(value="Auton")
         self.manualFrameDrawn = False;
 
-        # Create Entry Variables for the Send GPS Coords Button
-        self.gpsLatitudeVar = tk.DoubleVar()
-        self.gpsLongitudeVar = tk.DoubleVar()
 
         # Build UI and then Disable Widgets until we connect to Serial
         self._build_ui()
@@ -74,42 +76,31 @@ class XBeeDashboard(tk.Tk):
         #***************************************#
 
         top = ttk.Frame(self)
-        # top = ttk.Frame(main)
-        # top.pack(side="top", fill="x", padx=8, pady=6)
         top.grid(column=0, row=0);
 
         # Port Selector Group
         ttk.Label(top, text="Port:").grid(column=0, row=0);
         self.port_cb = ttk.Combobox(top, width=8, values=self._scan_ports())
-        #self.port_cb.pack(side="left", padx=4)
         self.port_cb.grid(column=1, row=0, padx=4)
         self.port_cb.set(self.port_cb['values'][0] if self.port_cb['values'] else "")
 
-       # ttk.Label(top, text="Baud:").pack(side="left", padx=(10,0))
         ttk.Label(top, text="Baud:").grid(column=2, row=0);
         self.baud_cb = ttk.Combobox(top, width=8, values=[9600, 19200, 38400, 57600, 115200])
-        #self.baud_cb.pack(side="left", padx=4)
         self.baud_cb.grid(column=3, row=0, padx=4)
         self.baud_cb.set(DEFAULT_BAUD)
 
         self.scan_btn = ttk.Button(top, text="Scan Ports", command=self._do_scan)
-        # self.scan_btn.pack(side="left", padx=6)
         self.scan_btn.grid(column=1, row=1, padx=4)
 
         self.connect_btn = ttk.Button(top, text="Connect", command=self.connect)
-        # self.connect_btn.pack(side="left", padx=6)
         self.connect_btn.grid(column=2, row=1, padx=4)
 
         self.disconnect_btn = ttk.Button(top, text="Disconnect", command=self.disconnect, state="disabled")
-        # self.disconnect_btn.pack(side="left", padx=2)
         self.disconnect_btn.grid(column=3, row=1, padx=4)
-
 
         # Left Frame: telemetry data + control settings (Auton/Manual, etc)
         self.left = ttk.Frame(self)
         self.left.grid(column=0, row=1)
-        # left.pack(side="")
-
 
         # Reserve the following spots in the grid for each frame:
         # For Dashboard and DashboardTwo, use column = 0, and then rows=0 and 1
@@ -148,7 +139,6 @@ class XBeeDashboard(tk.Tk):
         ttk.Label(self.telemetryGyroFrame, text='Roll: ').grid(column=0, row=0)
         ttk.Label(self.telemetryGyroFrame, text='Pitch: ').grid(column=0, row=1)
         ttk.Label(self.telemetryGyroFrame, text='Yaw: ').grid(column=0, row=2)
-        # todo: not sure if we are measuring in degrees or radians. Ask Max later
         ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=0)
         ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=1)
         ttk.Label(self.telemetryGyroFrame, text=' rad/s^2').grid(column=2, row=2)
@@ -159,7 +149,7 @@ class XBeeDashboard(tk.Tk):
 
         # GPS (Telemetry) Frame
         self.telemetryGPSFrame = ttk.LabelFrame(self.telemetryFrame, text = "GPS")
-        self.telemetryGPSFrame.grid(column=0, row=1, ipady=6)
+        self.telemetryGPSFrame.grid(column=0, row=1, ipady=6, sticky="w,e")
         # GPS Labels: Non-variable labels
         ttk.Label(self.telemetryGPSFrame, text='Latitude: ').grid(column=0, row=0)
         ttk.Label(self.telemetryGPSFrame, text='Longitude: ').grid(column=0, row=1)
@@ -171,6 +161,8 @@ class XBeeDashboard(tk.Tk):
         self.telemetryGPSLatVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLatVar).grid(column=1, row=0)
         self.telemetryGPSLonVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLonVar).grid(column=1, row=1)
         self.telemetryGPSAltVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSAltVar).grid(column=1, row=2)
+        # self.telemetryGPSFrame.config()
+
 
         # Euler Angles (Telemetry) Frame
         self.telemetryEulerFrame = ttk.LabelFrame(self.telemetryFrame, text = "Euler Angles")
@@ -186,6 +178,7 @@ class XBeeDashboard(tk.Tk):
         self.telemetryEulerIVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerIVar).grid(column=1, row=0)
         self.telemetryEulerJVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerJVar).grid(column=1, row=1)
         self.telemetryEulerKVarLabel = ttk.Label(self.telemetryEulerFrame, textvariable=self.telemetryEulerKVar).grid(column=1, row=2)
+        
         # "Mode" Frame
         self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
         self.modesFrame.grid(column=5, row=0)
@@ -199,11 +192,9 @@ class XBeeDashboard(tk.Tk):
         #***************************************************#
 
         middle = ttk.Frame(self)
-        # middle.pack(side="top", fill="both", expand=True, padx=8, pady=6)
         middle.grid(column=1, row=1)
 
         console_frame = ttk.LabelFrame(middle, text="Console")
-        # console_frame.pack(side="top", fill="both", expand=True)
         console_frame.grid(column=0, row=0)
         self.console = scrolledtext.ScrolledText(console_frame, height=12, state="disabled", wrap="none")
         self.console.pack(fill="both", expand=True, padx=4, pady=4)
@@ -212,7 +203,6 @@ class XBeeDashboard(tk.Tk):
         self.consoleCommandsFrame = ttk.LabelFrame(middle, text="Commands")
         self.consoleCommandsFrame.grid(column=0, row=1)
         # Command button to send the laptop's GPS coordinates
-        # button = ttk.Button(parent, text='Okay', command=submitForm)
         self.emergencyStopButton = ttk.Button(self.consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
         self.emergencyStopButton.grid(column=0, row=0)
 
@@ -228,14 +218,38 @@ class XBeeDashboard(tk.Tk):
         sendGPSLongitudeLabel.grid(column=3, row=1)
         self.sendGPSLongitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
         self.sendGPSLongitudeEntry.grid(column=4, row=1)        
-        # Right: Map and other Data
+        # Right: Control Algorithm Data, Calculations, etc
         right = ttk.Frame(self)
-        # right.pack(side="left", fill="both", expand=True)
         right.grid(row=1, column=3)
 
+        # Logo for GUI:
+        self.imgLogo = ImageTk.PhotoImage(Image.open('shieldSmallNoBG.png'))
+        self.logoLabel = ttk.Label(right, image=self.imgLogo).grid(column=0, row=0)
+        
+        # Controls Frame: Current GPS Location and Heading, as well as distance between
+        self.controlsFrame = ttk.LabelFrame(right, text="Controls Frame")
+        self.controlsFrame.grid(column=0, row=1)
+
+        # Controls Labels: Non-variable labels
+        ttk.Label(self.controlsFrame, text='Current Location: ').grid(column=0, row=2)
+        ttk.Label(self.controlsFrame, text='Current Destination: ').grid(column=0, row=3)
+
+        self.controlsLocationLat = ttk.Label(self.controlsFrame, textvariable=self.telemetryGPSLatVar).grid(column=1, row=2)
+        self.controlsLocationLon = ttk.Label(self.controlsFrame, textvariable=self.telemetryGPSLonVar).grid(column=2, row=2)
+
+        self.controlsDestLat = ttk.Label(self.controlsFrame, textvariable=self.gpsLatitudeVar).grid(column=1, row=3)
+        self.controlsDestLon = ttk.Label(self.controlsFrame, textvariable=self.gpsLongitudeVar).grid(column=2, row=3)
+
         # RX Data Button (Temporary until RX is on officially looped)
+        # todo: Make RX run in an official loop
         self.rxDataButton = ttk.Button(self.consoleCommandsFrame, text = 'Receive Data from TX', command=self._rxSensorData)
         self.rxDataButton.grid(row=2, column=0)
+
+        # LASTLY, perform any neccessy keybinds for general command panel:
+        self.emergencyStopButton.bind_all("<space>", self._emergyStopEventCmd)
+        # middle.bind('<space>', lambda e: self.emergencyStopButton.invoke())
+        # self.
+        # root.bind('<Return>', lambda e: action.invoke())
 
     def _init_disable(self):
         # Disable several buttons and widgets upon start up
@@ -394,27 +408,31 @@ class XBeeDashboard(tk.Tk):
         # Check to see if we are in the right condition
         # Case 1: We want to draw the Manual Frame and are in the right conditions
         if (self.manualFrameDrawn == False and self.modeVar.get() == "Manual"):
-            # self.drawControlFrame()
-            # telemetryFrame = ttk.LabelFrame(left, text="Telemetry")
             # Draw Control Frame
-            self.controlFrame = ttk.LabelFrame(self.left, text="Manual Controls")
-            self.controlFrame.grid(column=0, row=1)
+            self.manualFrame = ttk.LabelFrame(self.left, text="Manual Controls")
+            self.manualFrame.grid(column=0, row=1)
             # Draw Left and Right buttons
-            self.turnLeftButton = ttk.Button(self.controlFrame, text="Turn Left", command=self._manualTurnLeft)
+            self.turnLeftButton = ttk.Button(self.manualFrame, text="Turn Left", command=self._manualTurnLeft)
             self.turnLeftButton.grid(column=0, row = 0)
-            self.turnRightButton = ttk.Button(self.controlFrame, text="Turn Right", command=self._manualTurnRight)
+            self.turnRightButton = ttk.Button(self.manualFrame, text="Turn Right", command=self._manualTurnRight)
             self.turnRightButton.grid(column=1, row=0)
             self.manualFrameDrawn = True
+            # Bind the relevant functions for controlling the parafoil to the buttons
+            self.turnLeftButton.bind_all("<Left>", self._manualTurnLeftEvent)
+            self.turnRightButton.bind_all("<Right>", self._manualTurnRightEvent)
+            # todo: Fix this keybind to make manual control possible
             # Send a Packet to set the System to Manual Mode
             self._setToManual()
             # Send a Log of the Toggle to Console
             self._log("Toggled to Manual Mode")
             
         # Case 2: We want to destory the Frame  (and potentially draw the Auton frame) and are in the right conditions
-        # Todo: ask team what metrics / inputs should be needed for this section
         elif (self.manualFrameDrawn == True and self.modeVar.get() == "Auton"):
+            # Unbind the relevant functions for controlling the parafoil
+            self.turnLeftButton.unbind_all("<Left>")
+            self.turnRightButton.unbind_all("<Right>")
             # Destroy the Control Frame from the Left GUI:
-            self.controlFrame.destroy()
+            self.manualFrame.destroy()
             self.manualFrameDrawn = False
             # Send a Packet to set the System to Manual Mode
             self._setToAuto()
@@ -451,10 +469,25 @@ class XBeeDashboard(tk.Tk):
         self.serial_port.write(data)
         self._log("→ Manual LEFT command sent")
     
+    def _manualTurnLeftEvent(self, event=None):
+        data = b'L'+ bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual LEFT command sent (via keybind)")
+
     def _manualTurnRight(self):
         data = b'R' + bytes(8)
         self.serial_port.write(data)
         self._log("→ Manual RIGHT command sent")
+
+    def _manualTurnRightEvent(self, event=None):
+        data = b'R' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual RIGHT command sent (via keybind)")
+        
+
+    # def _manualTurnLeft(self, event=None):
+    # # your action
+    # pass
 
 
     ##############################################################
@@ -480,6 +513,12 @@ class XBeeDashboard(tk.Tk):
         self._log("→ Manual STOP command sent")
         self._log("E-Stoped the Parafoil.")
         # Todo: Ask team if the GUI should go "unresponsiive" after the function
+
+    def _emergyStopEventCmd(self, event=None):
+        data = b'S' + bytes(8)
+        self.serial_port.write(data)
+        self._log("→ Manual STOP command sent (via keybind)")
+        self._log("E-Stoped the Parafoil.")
    
     def consoleValidateCoordinates(self, lat, lon):
         """Validate latitude and longitude ranges."""
@@ -551,14 +590,38 @@ class XBeeDashboard(tk.Tk):
         # rxData = self.serial_port.read(64)
         # Alt method to read serial data
         rxData = self.serial_port.readline()
-        rxDataFloat = struct.unpack('f', rxData[0:4])
-        rxDataFloat2 = struct.unpack('f', rxData[4:8])
+        rxDataGPSLat = struct.unpack('f', rxData[0:4])
+        rxDataGPSLon = struct.unpack('f', rxData[4:8])
+        rxDataGPSAlt = struct.unpack('f', rxData[8:12])
+        rxDataAccelX = struct.unpack('f', rxData[12:16])
+        rxDataAccelY = struct.unpack('f', rxData[16:20])
+        rxDataAccelZ = struct.unpack('f', rxData[20:24])
+        rxDataGyroX  = struct.unpack('f', rxData[24:28])
+        rxDataGyroY  = struct.unpack('f', rxData[28:32])
+        rxDataGyroZ  = struct.unpack('f', rxData[32:36])
+        rxDataEulerI = struct.unpack('f', rxData[36:40])
+        rxDataEulerJ = struct.unpack('f', rxData[40:44])
+        rxDataEulerK = struct.unpack('f', rxData[44:48])
+        
         # rxDataStr = rxData.decode('utf-8').strip()
         # Grab specfic data from the sensors for each metric
         # For now, just print out data that is being sent to the console:
         self._log(f"Received Sensor Data: {rxData}")
-        self._log(f"Received Sensor Data as Floats: {rxDataFloat}")
-        self._log(f"Received Sensor Data as Floats: {rxDataFloat2}")
+        # self._log(f"Received Sensor Data as Floats: {rxDataFloat}")
+        # self._log(f"Received Sensor Data as Floats: {rxDataFloat2}")
+        self.telemetryAccelXVar.set(rxDataAccelX)
+        self.telemetryAccelYVar.set(rxDataAccelY)
+        self.telemetryAccelZVar.set(rxDataAccelZ)
+        self.telemetryGyroRollVar.set(rxDataGyroX)
+        self.telemetryGyroYawVar.set(rxDataGyroY)
+        self.telemetryGyroPitchVar.set(rxDataGyroZ)
+        self.telemetryGPSLatVar.set(rxDataGPSLat)
+        self.telemetryGPSLonVar.set(rxDataGPSLon)
+        self.telemetryGPSAltVar.set(rxDataGPSAlt)
+        self.telemetryEulerIVar.set(rxDataEulerI)
+        self.telemetryEulerKVar.set(rxDataEulerJ)
+        self.telemetryEulerJVar.set(rxDataEulerK)
+
     def _periodic_ui_update(self):
 
         # Run GUI Checks
