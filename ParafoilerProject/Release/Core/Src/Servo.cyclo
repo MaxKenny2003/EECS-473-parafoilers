@@ -1,0 +1,5 @@
+../Core/Src/Servo.c:11:6:servo_init	1
+../Core/Src/Servo.c:19:6:spin_servo_clockwise	2
+../Core/Src/Servo.c:29:6:spin_servo_counterclockwise	2
+../Core/Src/Servo.c:38:6:spin_servo	2
+../Core/Src/Servo.c:45:6:stop_servo	2

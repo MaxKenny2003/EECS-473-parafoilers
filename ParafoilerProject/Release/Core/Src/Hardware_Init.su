@@ -1,0 +1,2 @@
+../Core/Src/Hardware_Init.c:46:6:init_GPIO_IMU	40	static
+../Core/Src/Hardware_Init.c:53:9:init_Hardware_BNO085	8	static

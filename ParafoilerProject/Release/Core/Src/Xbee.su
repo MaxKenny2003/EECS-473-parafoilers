@@ -1,0 +1,11 @@
+../Core/Src/Xbee.c:27:6:xbee_init	16	static
+../Core/Src/Xbee.c:53:6:xbee_send_data	8	static
+../Core/Src/Xbee.c:58:6:xbee_receive_data	8	static
+../Core/Src/Xbee.c:86:6:HAL_UART_ErrorCallback	16	static
+../Core/Src/Xbee.c:130:6:HAL_UART_AbortReceiveCpltCallback	8	static
+../Core/Src/Xbee.c:147:6:handle_cmd	8	static
+../Core/Src/Xbee.c:63:6:HAL_UART_RxCpltCallback	8	static
+../Core/Src/Xbee.c:180:10:xbee_get_interrupt_count	0	static
+../Core/Src/Xbee.c:184:10:xbee_get_coord_count	0	static
+../Core/Src/Xbee.c:188:10:xbee_get_error_count	0	static
+../Core/Src/Xbee.c:192:10:xbee_get_restart_count	0	static

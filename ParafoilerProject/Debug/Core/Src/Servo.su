@@ -1,0 +1,6 @@
+../Core/Src/Servo.c:21:6:servo_init	16	static
+../Core/Src/Servo.c:52:6:update_servo_runtime	24	static
+../Core/Src/Servo.c:82:5:spin_servo	16	static
+../Core/Src/Servo.c:117:6:stop_servo	16	static
+../Core/Src/Servo.c:125:6:turnLeft	32	static
+../Core/Src/Servo.c:155:6:turnRight	32	static

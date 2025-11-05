@@ -1,0 +1,3 @@
+../Core/Src/Hardware_Init.c:24:13:HAL_Init_GPIO_Sensor	1
+../Core/Src/Hardware_Init.c:46:6:init_GPIO_IMU	1
+../Core/Src/Hardware_Init.c:53:9:init_Hardware_BNO085	1

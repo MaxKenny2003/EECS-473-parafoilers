@@ -1,0 +1,2 @@
+../Core/Src/Control.c:9:7:calc_angle	80	static
+../Core/Src/Control.c:34:7:normalize_angle	16	static
