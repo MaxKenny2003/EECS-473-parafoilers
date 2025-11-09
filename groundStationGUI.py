@@ -52,7 +52,12 @@ class XBeeDashboard(tk.Tk):
         # Controls Values
         self.gpsLatitudeVar = tk.DoubleVar()
         self.gpsLongitudeVar = tk.DoubleVar()
+        self.adjustAltitudeVar = tk.DoubleVar()
+        self.absoluteAltitudeVar = tk.DoubleVar() # Display the Distance between the Structure and the Ground (as opposed to Sea Level)
 
+        # Constant to adjust Altitude in order to gain Absolute Altitude
+        # North Campus: 280 Meters above Sealevel
+        self.adjustAltitudeVar.set(280.0)
         # Control Mode Radiobutton Labels
         self.modes = ["Auton", "Manual"]
         # Create a shared control variable for both Radiobuttons
@@ -154,13 +159,16 @@ class XBeeDashboard(tk.Tk):
         ttk.Label(self.telemetryGPSFrame, text='Latitude: ').grid(column=0, row=0)
         ttk.Label(self.telemetryGPSFrame, text='Longitude: ').grid(column=0, row=1)
         ttk.Label(self.telemetryGPSFrame, text='Altitude: ').grid(column=0, row=2)
+        ttk.Label(self.telemetryGPSFrame, text='Absolute Altitude: ').grid(column=0, row=3)
         ttk.Label(self.telemetryGPSFrame, text='°').grid(column=2, row=0)
         ttk.Label(self.telemetryGPSFrame, text='°').grid(column=2, row=1)
         ttk.Label(self.telemetryGPSFrame, text='m').grid(column=2, row=2)
+        ttk.Label(self.telemetryGPSFrame, text='m').grid(column=2, row=3)
         # GPS Labels: Display the text variable label
         self.telemetryGPSLatVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLatVar).grid(column=1, row=0)
         self.telemetryGPSLonVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSLonVar).grid(column=1, row=1)
         self.telemetryGPSAltVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.telemetryGPSAltVar).grid(column=1, row=2)
+        self.telemetryGPSAbsoluteAltVarLabel = ttk.Label(self.telemetryGPSFrame, textvariable=self.absoluteAltitudeVar).grid(column=1, row=3)
         # self.telemetryGPSFrame.config()
 
 
@@ -206,7 +214,6 @@ class XBeeDashboard(tk.Tk):
         self.emergencyStopButton = ttk.Button(self.consoleCommandsFrame, text="Emergency Stop / Deadfall", command=self._emergencyStopCmd)
         self.emergencyStopButton.grid(column=0, row=0)
 
-
         # Send GPS Coordinates (Button and Entries)
         self.sendGPSButton = ttk.Button(self.consoleCommandsFrame, text='Send Current GPS Coordinates', command=self._sendGPSCmd)
         self.sendGPSButton.grid(column=0, row=1)
@@ -218,7 +225,22 @@ class XBeeDashboard(tk.Tk):
         sendGPSLongitudeLabel.grid(column=3, row=1)
         self.sendGPSLongitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.gpsLongitudeVar)
         self.sendGPSLongitudeEntry.grid(column=4, row=1)        
-        # Right: Control Algorithm Data, Calculations, etc
+
+        # Adjust Altitude Constant (To make sure that GUI shows proper elevation)
+        self.adjustAltitudeLabel = ttk.Label(self.consoleCommandsFrame, text="Subtract Altitude by this value in Meters")
+        self.adjustAltitudeLabel.grid(column=0, row=3)
+        self.adjustAltitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.adjustAltitudeVar)
+        self.adjustAltitudeEntry.grid(column=1, row=3)
+        # Deployment Button (Add relevant metrics to the side)
+        # Todo: Ask Max if there should be some kind of condition before deploying (like only deploy if we're above 100 feet)
+        self.deploymentButton = ttk.Button(self.consoleCommandsFrame, text='Deploy Payload', command=self._deployPayloadCmd)
+        self.deploymentButton.grid(column=0, row=4)
+
+
+        #***************************************************#
+        #Right frame: Logo, deployment / control metrics, etc#
+        #***************************************************#   
+        # Right Frame Definition
         right = ttk.Frame(self)
         right.grid(row=1, column=3)
 
@@ -276,8 +298,6 @@ class XBeeDashboard(tk.Tk):
         # Lastly, Enable the Auton Mode by default
         self._log("Enabling Auton Mode by Default")
         self._setToAuto()
-        
-    
         
     ######################################################
     # Top Frame Functions: Serial, Connection, and others#
@@ -345,58 +365,6 @@ class XBeeDashboard(tk.Tk):
         self.scan_btn.config(state="normal")
         self._init_disable()
         self._log("Disconnected")
-
-    # Comment out the Thread Functions for now. 
-    # See if it will be useful later
-    # def _rx_worker(self):
-    #     buff = bytearray()
-    #     while not self.stop_event.is_set():
-    #         try:
-    #             if self.serial_port is None:
-    #                 break
-    #             data = self.serial_port.read(128)
-    #             if data:
-    #                 buff.extend(data)
-    #                 # handle lines
-    #                 while b'\n' in buff:
-    #                     idx = buff.index(b'\n')
-    #                     line = buff[:idx+1].decode(errors='replace').strip()
-    #                     buff = buff[idx+1:]
-    #                     self._handle_line(line)
-    #             else:
-    #                 time.sleep(0.01)
-    #         except Exception as e:
-    #             self._log(f"Serial read error: {e}")
-    #             time.sleep(0.5)
-
-    # def _handle_line(self, line):
-    #     # Display raw line
-    #     self._log("RX: " + line)
-
-    #     # Expect telemetry as KEY=VALUE;KEY=VALUE;...\n
-    #     try:
-    #         parts = line.strip().split(';')
-    #         changed = False
-    #         for p in parts:
-    #             if '=' in p:
-    #                 k,v = p.split('=',1)
-    #                 k=k.strip().upper()
-    #                 v=v.strip()
-    #                 if k in self.telemetry:
-    #                     self.telemetry[k] = v
-    #                     changed = True
-    #                     if k == "TEMP":
-    #                         try:
-    #                             self.temp_history.append(float(v))
-    #                         except:
-    #                             pass
-    #         if changed:
-    #             self._update_dashboard_widgets()
-    #     except Exception as e:
-    #         # not telemetry or parse error — ignore for dashboard
-    #         pass
-
-
 
     #################################################
     # Left-Middle Frame Functions: Telemetry, Modes #
@@ -622,6 +590,13 @@ class XBeeDashboard(tk.Tk):
         self.telemetryEulerKVar.set(rxDataEulerJ)
         self.telemetryEulerJVar.set(rxDataEulerK)
 
+    def _deployPayloadCmd(self):
+        self._log("Deploying Payload...")
+        # self._log(f"Drop Height") #Todo: change this to relflect proper height later
+        # Todo: Double check if this is the right char
+        data = b'P' + bytes(8)
+        self.serial_port.write(data)
+
     def _periodic_ui_update(self):
 
         # Run GUI Checks
@@ -629,6 +604,8 @@ class XBeeDashboard(tk.Tk):
         # If we are currently connected, then run the RX Sensor Data Function
         # if(self.serial_port.is_open):
         #     self._rxSensorData()
+        # Recalculate self.absoluteAltitudeVar
+        self.absoluteAltitudeVar = self.telemetryGPSAltVar.get() - self.adjustAltitudeVar.get();
         self.after(GUI_UPDATE_PERIOD, self._periodic_ui_update)
 
     def _send_text(self):
