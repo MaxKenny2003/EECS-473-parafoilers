@@ -76,6 +76,13 @@ class XBeeDashboard(tk.Tk):
         self.quatXVar = tk.DoubleVar()
         self.quatYVar = tk.DoubleVar()
 
+        # [24-25] Absolute Height
+        self.adjustAltitudeVar = tk.DoubleVar()
+        self.absoluteAltitudeVar = tk.DoubleVar() # Display the Distance between the Structure and the Ground (as opposed to Sea Level)
+        # Initalize constant offset based on testing location
+        # North Campus: 280 Meters above Sealevel
+        self.adjustAltitudeVar.set(280.0)
+        # --- Append data to plot deques ---
         # Control Mode Radiobutton Labels
         self.modes = ["Auton", "Manual"]
         # Create a shared control variable for both Radiobuttons
@@ -145,7 +152,8 @@ class XBeeDashboard(tk.Tk):
 
         # EKF State Frame
         self.telemetryEKFFrame = ttk.LabelFrame(self.telemetryFrame, text= "EKF State (NED)")
-        self.telemetryEKFFrame.grid(column=0, row=0, ipady=6, sticky="nsew", padx=5, pady=5)
+        # self.telemetryEKFFrame.grid(column=0, row=0, ipady=6, sticky="nsew", padx=5, pady=5)
+        self.telemetryEKFFrame.grid(column=0, row=0, ipady=6, ipadx=15, sticky="nsew", padx=5, pady=5)
         ttk.Label(self.telemetryEKFFrame, text='Pos North: ').grid(column=0, row=0, sticky="w")
         ttk.Label(self.telemetryEKFFrame, text='Pos East: ').grid(column=0, row=1, sticky="w")
         ttk.Label(self.telemetryEKFFrame, text='Vel North: ').grid(column=0, row=2, sticky="w")
@@ -249,6 +257,13 @@ class XBeeDashboard(tk.Tk):
         self.telemetryQuatFrame.columnconfigure(3, weight=1)
         self.telemetryQuatFrame.columnconfigure(5, weight=1)
 
+        # Absolute Height Frame
+        self.telemetryAbsHeightFrame = ttk.LabelFrame(self.telemetryFrame, text="Absolute Height")
+        self.telemetryAbsHeightFrame.grid(column=0, row=4, ipady=6, columnspan=2, sticky="nsew", padx=5, pady=5)
+        ttk.Label(self.telemetryAbsHeightFrame, text='Absolute Height: ').grid(column=0, row=0, sticky="w")
+        ttk.Label(self.telemetryAbsHeightFrame, textvariable=self.absoluteAltitudeVar).grid(column=1, row=0, sticky="e")
+        ttk.Label(self.telemetryAbsHeightFrame, text= ' m').grid(column=2, row=0, sticky="w")
+
         # "Mode" Frame
         self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
         self.modesFrame.pack(fill="x", expand=False, pady=5) # pack this below telemetry
@@ -303,8 +318,19 @@ class XBeeDashboard(tk.Tk):
         self.sendGPSLongitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.gpsLongitudeVar, width=10)
         self.sendGPSLongitudeEntry.grid(column=4, row=1, padx=(0,5))        
         
+        # Reset Plot Button
         self.resetPlotButton = ttk.Button(self.consoleCommandsFrame, text='Reset Plots', command=self._clearPlotData)
-        self.resetPlotButton.grid(column=1, row=3)
+        self.resetPlotButton.grid(column=0, row=3)
+
+        # Adjust Alitude Entry
+        self.adjustAltitudeLabel = ttk.Label(self.consoleCommandsFrame, text="Subtract Altitude by this value in Meters")
+        self.adjustAltitudeLabel.grid(column=0, row=4)
+        self.adjustAltitudeEntry = ttk.Entry(self.consoleCommandsFrame, textvariable=self.adjustAltitudeVar)
+        self.adjustAltitudeEntry.grid(column=1, row=4)
+        # Deployment Button (Add relevant metrics to the side)
+        # Todo: Ask Max if there should be some kind of condition before deploying (like only deploy if we're above 100 feet)
+        self.deploymentButton = ttk.Button(self.consoleCommandsFrame, text='Deploy Payload', command=self._deployPayloadCmd)
+        self.deploymentButton.grid(column=0, row=5)
         
         #***************************************************#
         # Right frame: Plots
@@ -368,6 +394,8 @@ class XBeeDashboard(tk.Tk):
         self.sendGPSLongitudeEntry.config(state="disabled")
         self.turnLeftButton.config(state="disabled")
         self.turnRightButton.config(state="disabled")
+        self.deploymentButton.config(state="disabled")
+        self.adjustAltitudeEntry.config(state="disabled")
 
     def _init_enable(self):
         # Enable several buttons and widegets upon start up
@@ -379,6 +407,8 @@ class XBeeDashboard(tk.Tk):
         self.sendGPSLongitudeEntry.config(state="normal")
         self.turnLeftButton.config(state="normal")
         self.turnRightButton.config(state="normal")
+        self.deploymentButton.config(state="normal")
+        self.adjustAltitudeEntry.config(state="normal")
         
         self.modeVar.set("Auton")
         self.toggleModeCheck() # Call this to set the correct initial state
@@ -658,7 +688,6 @@ class XBeeDashboard(tk.Tk):
         self.quatXVar.set(round(payload[22], 4))
         self.quatYVar.set(round(payload[23], 4))
         
-        # --- Append data to plot deques ---
         if not self.time_history:
              self.start_time = time.time()
              self.time_history.append(0)
@@ -734,6 +763,12 @@ class XBeeDashboard(tk.Tk):
         # --- Redraw Canvas ---
         self.canvas.draw_idle()
 
+    def _deployPayloadCmd(self):
+        self._log("Deploying Payload...")
+        # self._log(f"Drop Height") #Todo: change this to relflect proper height later
+        # Todo: Double check if this is the right char
+        data = b'P' + bytes(8)
+        self.serial_port.write(data)
 
     def _periodic_ui_update(self):
         # Run GUI Checks
