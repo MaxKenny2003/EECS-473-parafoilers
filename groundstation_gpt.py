@@ -76,7 +76,8 @@ class XBeeDashboard(tk.Tk):
         self.quatXVar = tk.DoubleVar()
         self.quatYVar = tk.DoubleVar()
 
-        # [24-25] Absolute Height
+        # [24] Altitude
+        self.altitudeVar = tk.DoubleVar()
         self.adjustAltitudeVar = tk.DoubleVar()
         self.absoluteAltitudeVar = tk.DoubleVar() # Display the Distance between the Structure and the Ground (as opposed to Sea Level)
         # Initalize constant offset based on testing location
@@ -154,115 +155,99 @@ class XBeeDashboard(tk.Tk):
         self.telemetryEKFFrame = ttk.LabelFrame(self.telemetryFrame, text= "EKF State (NED)")
         # self.telemetryEKFFrame.grid(column=0, row=0, ipady=6, sticky="nsew", padx=5, pady=5)
         self.telemetryEKFFrame.grid(column=0, row=0, ipady=6, ipadx=15, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryEKFFrame, text='Pos North: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text='Pos East: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text='Vel North: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text='Vel East: ').grid(column=0, row=3, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text='Head Bias: ').grid(column=0, row=4, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, textvariable=self.telemetryEkfPosNVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryEKFFrame, textvariable=self.telemetryEkfPosEVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryEKFFrame, textvariable=self.telemetryEkfVelNVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryEKFFrame, textvariable=self.telemetryEkfVelEVar).grid(column=1, row=3, sticky="e")
-        ttk.Label(self.telemetryEKFFrame, textvariable=self.telemetryEkfBiasVar).grid(column=1, row=4, sticky="e")
-        ttk.Label(self.telemetryEKFFrame, text=' m').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text=' m').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text=' m/s').grid(column=2, row=2, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text=' m/s').grid(column=2, row=3, sticky="w")
-        ttk.Label(self.telemetryEKFFrame, text=' rad').grid(column=2, row=4, sticky="w")
+        ttk.Label(self.telemetryEKFFrame, text='Pos North: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryEKFFrame, text='Pos East: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryEKFFrame, text='Vel North: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryEKFFrame, text='Vel East: ').grid(column=0, row=3, sticky="e")
+        ttk.Label(self.telemetryEKFFrame, text='Head Bias: ').grid(column=0, row=4, sticky="e")
+
+        ttk.Label(self.telemetryEKFFrame, text=(f'{self.telemetryEkfPosNVar.get()} m')).grid(column=1, row=0, sticky="w")
+        ttk.Label(self.telemetryEKFFrame, text=(f'{self.telemetryEkfPosEVar.get()} m')).grid(column=1, row=1, sticky="w")
+        ttk.Label(self.telemetryEKFFrame, text=(f'{self.telemetryEkfVelNVar.get()} m/s')).grid(column=1, row=2, sticky="w")
+        ttk.Label(self.telemetryEKFFrame, text=(f'{self.telemetryEkfVelEVar.get()} m/s')).grid(column=1, row=3, sticky="w")
+        ttk.Label(self.telemetryEKFFrame, text=(f'{self.telemetryEkfBiasVar.get()} °')).grid(column=1, row=4, sticky="w")
         self.telemetryEKFFrame.columnconfigure(1, weight=1)
 
         # Raw GPS Frame
         self.telemetryRawGPSFrame = ttk.LabelFrame(self.telemetryFrame, text= "Raw GPS")
         self.telemetryRawGPSFrame.grid(column=1, row=0, ipady=6, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryRawGPSFrame, text='Raw Lat: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text='Raw Lon: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text='Raw Speed: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text='Raw COG: ').grid(column=0, row=3, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, textvariable=self.telemetryRawGPSLatVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryRawGPSFrame, textvariable=self.telemetryRawGPSLonVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryRawGPSFrame, textvariable=self.telemetryRawGPSSpeedVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryRawGPSFrame, textvariable=self.telemetryRawGPSHeadVar).grid(column=1, row=3, sticky="e")
-        ttk.Label(self.telemetryRawGPSFrame, text=' °').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text=' °').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text=' m/s').grid(column=2, row=2, sticky="w")
-        ttk.Label(self.telemetryRawGPSFrame, text=' °').grid(column=2, row=3, sticky="w")
+        ttk.Label(self.telemetryRawGPSFrame, text='Raw Lat: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryRawGPSFrame, text='Raw Lon: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryRawGPSFrame, text='Raw Speed: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryRawGPSFrame, text='Raw COG: ').grid(column=0, row=3, sticky="e")
+        ttk.Label(self.telemetryRawGPSFrame, text=(f'{self.telemetryRawGPSLatVar.get()}°')).grid(column=1, row=0, sticky="w")
+        ttk.Label(self.telemetryRawGPSFrame, text=(f'{self.telemetryRawGPSLonVar.get()}°')).grid(column=1, row=1, sticky="w")
+        ttk.Label(self.telemetryRawGPSFrame, text=(f'{self.telemetryRawGPSSpeedVar.get()}m/s')).grid(column=1, row=2, sticky="w")
+        ttk.Label(self.telemetryRawGPSFrame, text=(f'{self.telemetryRawGPSHeadVar.get()}°')).grid(column=1, row=3, sticky="w")
         self.telemetryRawGPSFrame.columnconfigure(1, weight=1)
 
         # Fused State Frame
         self.telemetryFusedFrame = ttk.LabelFrame(self.telemetryFrame, text = "Fused State (EKF)")
         self.telemetryFusedFrame.grid(column=0, row=1, ipady=6, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryFusedFrame, text='Fused Lat: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryFusedFrame, text='Fused Lon: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryFusedFrame, text='Fused Head: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryFusedFrame, textvariable=self.telemetryFusedLatVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryFusedFrame, textvariable=self.telemetryFusedLonVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryFusedFrame, textvariable=self.telemetryFusedHeadVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryFusedFrame, text=' °').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryFusedFrame, text=' °').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryFusedFrame, text=' °').grid(column=2, row=2, sticky="w")
+        ttk.Label(self.telemetryFusedFrame, text='Fused Lat: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryFusedFrame, text='Fused Lon: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryFusedFrame, text='Fused Head: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryFusedFrame, text=(f'{self.telemetryFusedLatVar.get()}°')).grid(column=1, row=0, sticky="w")
+        ttk.Label(self.telemetryFusedFrame, text=(f'{self.telemetryFusedLonVar.get()}°')).grid(column=1, row=1, sticky="w")
+        ttk.Label(self.telemetryFusedFrame, text=(f'{self.telemetryFusedHeadVar.get()}°')).grid(column=1, row=2, sticky="w")
         self.telemetryFusedFrame.columnconfigure(1, weight=1)
 
         # Attitude Frame (Euler Angles)
         self.telemetryAttitudeFrame = ttk.LabelFrame(self.telemetryFrame, text="Attitude (Euler)")
         self.telemetryAttitudeFrame.grid(column=1, row=1, ipady=6, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryAttitudeFrame, text='Roll: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryAttitudeFrame, text='Pitch: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryAttitudeFrame, text='Yaw: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryAttitudeFrame, textvariable=self.rollVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryAttitudeFrame, textvariable=self.pitchVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryAttitudeFrame, textvariable=self.yawVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryAttitudeFrame, text=' °').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryAttitudeFrame, text=' °').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryAttitudeFrame, text=' °').grid(column=2, row=2, sticky="w")
+        ttk.Label(self.telemetryAttitudeFrame, text='Roll: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryAttitudeFrame, text='Pitch: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryAttitudeFrame, text='Yaw: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryAttitudeFrame, text=(f'{self.rollVar.get()}°')).grid(column=1, row=0, sticky="w")
+        ttk.Label(self.telemetryAttitudeFrame, text=(f'{self.pitchVar.get()}°')).grid(column=1, row=1, sticky="w")
+        ttk.Label(self.telemetryAttitudeFrame, text=(f'{self.yawVar.get()}°')).grid(column=1, row=2, sticky="w")
         self.telemetryAttitudeFrame.columnconfigure(1, weight=1)
 
         # Gyroscope Frame
         self.telemetryGyroFrame = ttk.LabelFrame(self.telemetryFrame, text="Gyroscope (Body)")
         self.telemetryGyroFrame.grid(column=0, row=2, ipady=6, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryGyroFrame, text='Gyro X: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryGyroFrame, text='Gyro Y: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryGyroFrame, text='Gyro Z: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryGyroFrame, textvariable=self.gyroXVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryGyroFrame, textvariable=self.gyroYVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryGyroFrame, textvariable=self.gyroZVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryGyroFrame, text=' °/s').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryGyroFrame, text=' °/s').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryGyroFrame, text=' °/s').grid(column=2, row=2, sticky="w")
+        ttk.Label(self.telemetryGyroFrame, text='Gyro X: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryGyroFrame, text='Gyro Y: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryGyroFrame, text='Gyro Z: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryGyroFrame, text=(f"{self.gyroXVar.get()}°/s")).grid(column=1, row=0, sticky="w")
+        ttk.Label(self.telemetryGyroFrame, text=(f"{self.gyroYVar.get()}°/s")).grid(column=1, row=1, sticky="w")
+        ttk.Label(self.telemetryGyroFrame, text=(f"{self.gyroZVar.get()}°/s")).grid(column=1, row=2, sticky="w")
         self.telemetryGyroFrame.columnconfigure(1, weight=1)
 
         # Accelerometer Frame
         self.telemetryAccelFrame = ttk.LabelFrame(self.telemetryFrame, text="Accelerometer (Body)")
         self.telemetryAccelFrame.grid(column=1, row=2, ipady=6, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryAccelFrame, text='Accel X: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryAccelFrame, text='Accel Y: ').grid(column=0, row=1, sticky="w")
-        ttk.Label(self.telemetryAccelFrame, text='Accel Z: ').grid(column=0, row=2, sticky="w")
-        ttk.Label(self.telemetryAccelFrame, textvariable=self.accelXVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryAccelFrame, textvariable=self.accelYVar).grid(column=1, row=1, sticky="e")
-        ttk.Label(self.telemetryAccelFrame, textvariable=self.accelZVar).grid(column=1, row=2, sticky="e")
-        ttk.Label(self.telemetryAccelFrame, text=' m/s²').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryAccelFrame, text=' m/s²').grid(column=2, row=1, sticky="w")
-        ttk.Label(self.telemetryAccelFrame, text=' m/s²').grid(column=2, row=2, sticky="w")
+        ttk.Label(self.telemetryAccelFrame, text='Accel X: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryAccelFrame, text='Accel Y: ').grid(column=0, row=1, sticky="e")
+        ttk.Label(self.telemetryAccelFrame, text='Accel Z: ').grid(column=0, row=2, sticky="e")
+        ttk.Label(self.telemetryAccelFrame, text=((f"{self.accelXVar.get()}m/s²"))).grid(column=1, row=0, sticky="w");
+        ttk.Label(self.telemetryAccelFrame, text=((f"{self.accelYVar.get()}m/s²"))).grid(column=1, row=1, sticky="w");
+        ttk.Label(self.telemetryAccelFrame, text=((f"{self.accelZVar.get()}m/s²"))).grid(column=1, row=2, sticky="w");
         self.telemetryAccelFrame.columnconfigure(1, weight=1)
         
         # Quaternion Frame
         self.telemetryQuatFrame = ttk.LabelFrame(self.telemetryFrame, text="Quaternion")
         self.telemetryQuatFrame.grid(column=0, row=3, ipady=6, columnspan=2, sticky="nsew", padx=5, pady=5)
         ttk.Label(self.telemetryQuatFrame, text='Quat W: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatWVar).grid(column=1, row=0, sticky="e")
+        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatWVar).grid(column=1, row=0, sticky="w")
         ttk.Label(self.telemetryQuatFrame, text='Quat X: ').grid(column=2, row=0, sticky="w")
-        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatXVar).grid(column=3, row=0, sticky="e")
+        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatXVar).grid(column=3, row=0, sticky="w")
         ttk.Label(self.telemetryQuatFrame, text='Quat Y: ').grid(column=4, row=0, sticky="w")
-        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatYVar).grid(column=5, row=0, sticky="e")
+        ttk.Label(self.telemetryQuatFrame, textvariable=self.quatYVar).grid(column=5, row=0, sticky="w")
         self.telemetryQuatFrame.columnconfigure(1, weight=1)
         self.telemetryQuatFrame.columnconfigure(3, weight=1)
         self.telemetryQuatFrame.columnconfigure(5, weight=1)
 
-        # Absolute Height Frame
-        self.telemetryAbsHeightFrame = ttk.LabelFrame(self.telemetryFrame, text="Absolute Height")
-        self.telemetryAbsHeightFrame.grid(column=0, row=4, ipady=6, columnspan=2, sticky="nsew", padx=5, pady=5)
-        ttk.Label(self.telemetryAbsHeightFrame, text='Absolute Height: ').grid(column=0, row=0, sticky="w")
-        ttk.Label(self.telemetryAbsHeightFrame, textvariable=self.absoluteAltitudeVar).grid(column=1, row=0, sticky="e")
-        ttk.Label(self.telemetryAbsHeightFrame, text= ' m').grid(column=2, row=0, sticky="w")
+        # Altitude / Absolute Height Frame
+        self.telemetryAltitudeFrame = ttk.LabelFrame(self.telemetryFrame, text="Altitude / Absolute Height")
+        self.telemetryAltitudeFrame.grid(column=0, row=4, ipady=6, columnspan=2, sticky="nsew", padx=5, pady=5)
+        ttk.Label(self.telemetryAltitudeFrame, text= 'Altitude: ').grid(column=0, row=0, sticky="e")
+        ttk.Label(self.telemetryAltitudeFrame, text='Absolute Height: ').grid(column=0, row=1, sticky="e")
+        # ttk.Label(self.telemetryAltitudeFrame, text=("{altitude}m".format(altitude = self.altitudeVar.get()))).grid(column=1, row=0, sticky="e")
+        # ttk.Label(self.telemetryAltitudeFrame, text=("{altitude}m".format(altitude = self.absoluteAltitudeVar.get()))).grid(column=1, row=1, sticky="e")
+        ttk.Label(self.telemetryAltitudeFrame, text=((f"{self.altitudeVar.get()}m"))).grid(column=1, row=0, sticky="e")
+        ttk.Label(self.telemetryAltitudeFrame, text=((f"{self.absoluteAltitudeVar.get()}m"))).grid(column=1, row=1, sticky="e")
+        # ttk.Label(self.telemetryAltitudeFrame, text=("{altitude}m".format(altitude = self.absoluteAltitudeVar.get()))).grid(column=1, row=1, sticky="e")
 
         # "Mode" Frame
         self.modesFrame = ttk.LabelFrame(self.left, text="Modes")
@@ -632,7 +617,7 @@ class XBeeDashboard(tk.Tk):
         self._update_plots()
 
     def _rxSensorData(self):
-        expected_len = 97
+        expected_len = 101
         if self.serial_port.in_waiting < expected_len:
             return # Not enough data for a full packet
 
@@ -645,7 +630,7 @@ class XBeeDashboard(tk.Tk):
             self.serial_port.reset_input_buffer() # Clear buffer on error
             return
 
-        payload = struct.unpack('<24f', rxData[0:expected_len-1])
+        payload = struct.unpack('<25f', rxData[0:expected_len-1])
 
         # [0-2] Fused State
         self.telemetryFusedLatVar.set(round(payload[0], 6))
@@ -687,6 +672,9 @@ class XBeeDashboard(tk.Tk):
         self.quatWVar.set(round(payload[21], 4))
         self.quatXVar.set(round(payload[22], 4))
         self.quatYVar.set(round(payload[23], 4))
+
+        # [24] Altitude 
+        self.altitudeVar.set(round(payload[24], 4))
         
         if not self.time_history:
              self.start_time = time.time()
@@ -778,7 +766,7 @@ class XBeeDashboard(tk.Tk):
         if self.serial_port and self.serial_port.is_open:
             try:
                 # Process all complete packets in the buffer
-                while self.serial_port.in_waiting >= 97:
+                while self.serial_port.in_waiting >= 101:
                     self._rxSensorData()
                 
                 # Update plots with any new data
